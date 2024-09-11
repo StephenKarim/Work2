@@ -1,0 +1,145 @@
+import pandas as pd
+import time
+from joblib import Parallel, delayed
+from datetime import datetime
+import os
+import shutil
+import logging
+from multiprocessing import cpu_count
+from openpyxl import Workbook
+from openpyxl.styles import PatternFill, Border, Side, Font
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+
+# Set up logging
+logging.basicConfig(filename='process_log.log', level=logging.INFO)
+
+# Start the timer for the total process
+start_time = time.time()
+
+# Define the file paths to search
+file_paths = [
+    r"U:\CCU\SharedFolders\A19A\A19(A) Database with AVK\A19(A) DATABASE (branch&ccc) - EXCEL WEF OCT 2018 NEW.xlsx",
+    # Add other paths as needed
+]
+
+# Define the local directory where the files will be copied to
+local_directory = r"C:\Users\00015221\Desktop\python\Scripts\test"
+
+# Function to copy a single file
+def copy_file(file_path, local_directory):
+    file_name = os.path.basename(file_path)
+    local_file_path = os.path.join(local_directory, file_name)
+    shutil.copy2(file_path, local_file_path)
+    return local_file_path
+
+# Function to copy files in parallel using ThreadPoolExecutor
+def copy_files_to_local(shared_file_paths, local_directory, max_workers=5):
+    if not os.path.exists(local_directory):
+        os.makedirs(local_directory)
+    local_file_paths = []
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = [executor.submit(copy_file, file_path, local_directory) for file_path in shared_file_paths]
+        for future in futures:
+            local_file_paths.append(future.result())
+    return local_file_paths
+
+# Copy files using parallel threads
+local_file_paths = copy_files_to_local(file_paths, local_directory, max_workers=5)
+
+# Load the Excel file containing the search terms
+search_terms_df = pd.read_excel(r"C:\Users\00015221\Desktop\python\Scripts\test\Info.xlsx")
+
+# Extract the first row (index 0 in DataFrame)
+row = search_terms_df.iloc[0]
+
+# Function to clean strings
+def clean_string(text):
+    return text.replace('\n', ' ').replace('\t', ' ').strip()
+
+# Create a dictionary with the extracted search terms
+new_search_terms = {
+    "first_name": clean_string(str(row["First Name"])),
+    "last_name": clean_string(str(row["Last Name"])),
+}
+
+first_name = new_search_terms.get("first_name", "Unknown").lower()
+last_name = new_search_terms.get("last_name", "Unknown").lower()
+
+# Function to search for folders by first and last name in a directory
+def search_folders(directory, first_name, last_name):
+    results = []
+    for folder in Path(directory).iterdir():
+        if folder.is_dir() and first_name in folder.name.lower() and last_name in folder.name.lower():
+            results.append(folder)
+    return results
+
+# Search for folders matching the first and last name in a specific directory
+folder_search_directory = r"C:\Users\00015221\Desktop\python\Scripts\test_folders"
+matched_folders = search_folders(folder_search_directory, first_name, last_name)
+
+# Function to process matched folders (similar to matched rows)
+def process_folders(matched_folders):
+    folder_results = []
+    for folder in matched_folders:
+        result = {
+            "Folder Name": folder.name,
+            "Folder Path": str(folder)
+        }
+        folder_results.append(result)
+    return folder_results
+
+folder_results = process_folders(matched_folders)
+
+# Parallel processing to handle files in batches (existing file processing logic)
+def process_excel_file(file_path, search_terms_per_file):
+    all_results = []
+    # Logic for processing files goes here (same as before)
+    return all_results
+
+def process_files_in_parallel(file_paths, search_terms_per_file):
+    all_results = Parallel(n_jobs=cpu_count() - 1)(delayed(process_excel_file)(file_path, search_terms_per_file) for file_path in file_paths)
+    return [item for sublist in all_results for item in sublist]
+
+all_results = process_files_in_parallel(local_file_paths, new_search_terms)
+
+# Prepare for writing to Excel
+workbook = Workbook()
+sheet = workbook.active
+sheet.title = "Results"
+
+# Add headers for file, folder, and row
+sheet.append(["File/Folder", "Path"])
+
+# Define styles
+header_fill = PatternFill(start_color="0033A0", end_color="0033A0", fill_type="solid") # Dark blue for headers
+header_font = Font(bold=True, color="FFFFFF")
+thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
+
+# Freeze top row for better navigation
+sheet.freeze_panes = "A2"
+
+# Write folder search results to the Excel file
+for result in folder_results:
+    row_num = sheet.max_row + 1
+    sheet.append([result["Folder Name"], result["Folder Path"]])
+    
+    # Add hyperlink to the folder path
+    sheet.cell(row=row_num, column=2).hyperlink = result["Folder Path"]
+    sheet.cell(row=row_num, column=2).value = result["Folder Name"]
+    
+    # Apply formatting
+    sheet.cell(row=row_num, column=2).font = header_font
+    sheet.cell(row=row_num, column=2).border = thin_border
+
+# Save the workbook
+current_time = datetime.now().strftime("%Y-%m-%d %H-%M-%S")
+output_file = f"{first_name}_{last_name}_{current_time} Search_results.xlsx"
+workbook.save(output_file)
+
+# End the timer and calculate the total runtime
+end_time = time.time()
+total_runtime = end_time - start_time
+
+print(f"---------Total search complete. Results saved to {output_file}")
+print(f"---------Total Runtime: {total_runtime:.2f} seconds")
