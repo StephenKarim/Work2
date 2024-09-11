@@ -1,38 +1,202 @@
+import pandas as pd
+import time
+from joblib import Parallel, delayed
+from datetime import datetime
+import os
+import shutil
+import logging
+from multiprocessing import cpu_count
+from openpyxl import Workbook
+from openpyxl.styles import PatternFill, Border, Side, Font
+from openpyxl.utils import get_column_letter
+from concurrent.futures import ThreadPoolExecutor
+
+# Set up logging
+logging.basicConfig(filename='process_log.log', level=logging.INFO)
+
+# Start the timer for the total process
+start_time = time.time()
+
+# Define the file paths to search
+file_paths = [
+    r"U:\\CCU\\SharedFolders\\A19A\\A19(A) Database with AVK\\A19(A) DATABASE (branch&ccc) - EXCEL WEF OCT 2018 NEW.xlsx",
+    r"U:\\CCU\\SharedFolders\\DBASE\\CCU DBASE\\CCU DBASE\\CCU_DBASE\\1.CCU DBASE 2008 TO 2019 [working].xlsm",  
+    r"U:\\CCU\\SharedFolders\\DBASE\\CCU DBASE\\CCU DBASE\\CCU_DBASE\\3.CCU DBASE WEF APRIL 2024.xlsx",   
+    r"U:\\CCU\\SharedFolders\\A19A\\A19(A) Database with AVK\\A19A\\A19(A) Database with AVK\\A19(A)DATABSE-EXCEL W.E.F. JAN2004\\A19(A)DATABASE-EXCEL W.E.F. JAN2004.xls",
+    r"U:\\CCU\\SharedFolders\\A19A\\A19(A) Database with AVK\\A19A\\A19(A) Database with AVK\\A19(A)DATABASE (branch&ccc) -EXCEL WEF JAN 2004.xls",
+    r"U:\\CCU\\SharedFolders\\Stephen Karim\\python_3.4\\Scripts\\Test\\A19(A)DATABASE-EXCEL W.E.F. JAN2004project.xls",
+    r"U:\\CCU\\SharedFolders\\A19A\\A19(A) Database with AVK\\A19A\\A19(A) Database with AVK\\A19A(previously in  Access dbase) prior to 2004.xls",
+    r"U:\\CCU\\SharedFolders\\A19A\\A19(A) Database with AVK\\A19A\\A19(A) Database with AVK\\A19A(previously in  Access dbase).xls",
+    r"U:\\CCU\\SharedFolders\\A19A\\A19(A) Database with AVK\\A19A\\A19(A) Database with AVK\\CCC_A19(A) WEF_MARCH2006.xls",
+    r"U:\\CCU\\SharedFolders\\A19A\\A19(A) Database with AVK\\A19A\\A19(A) Database with AVK\\CCCA19ADebts-2005.xls",
+    r"U:\\CCU\\GroupFolders\\Judgement Dbase\\JUDGEMENT DATABASE\\Judgement Database.xls",
+    r"U:\\CCU\\GroupFolders\\Judgement Dbase\\JUDGEMENT DATABASE\\Legal Action Database\\LEGAL ACTION DATABASE.xls",
+    r"U:\\CCU\\SharedFolders\\DBASE\\WRITE OFF-REPAID\\Write off-repaid.xls",
+]
+
+# Define the local directory where the files will be copied to
+local_directory = r"C:\\Users\\00015221\\Desktop\\python\\Scripts\\test"
+
+# Function to copy a single file
+def copy_file(file_path, local_directory):
+    file_name = os.path.basename(file_path)
+    local_file_path = os.path.join(local_directory, file_name)
+    shutil.copy2(file_path, local_file_path)
+    print(f"Copied {file_name} to {local_file_path}")
+    return local_file_path
+
+# Function to copy files in parallel using ThreadPoolExecutor
+def copy_files_to_local(shared_file_paths, local_directory, max_workers=5):
+    if not os.path.exists(local_directory):
+        os.makedirs(local_directory)
+
+    # Use ThreadPoolExecutor to copy files concurrently
+    local_file_paths = []
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = [executor.submit(copy_file, file_path, local_directory) for file_path in shared_file_paths]
+        for future in futures:
+            local_file_paths.append(future.result())
+
+    return local_file_paths
+
+# Copy files using parallel threads
+local_file_paths = copy_files_to_local(file_paths, local_directory, max_workers=5)
+
+# Load the Excel file containing the search terms
+search_terms_df = pd.read_excel(r"C:\\Users\\00015221\\Desktop\\python\\Scripts\\test\\Info.xlsx")
+
+# Extract the second row (index 0 in DataFrame)
+row = search_terms_df.iloc[0]
+
+# Function to normalize DOB to a consistent format (dd/mm/yyyy)
+def normalize_dob(date_str):
+    try:
+        return datetime.strptime(date_str.strip(), "%d/%m/%Y").strftime("%d/%m/%Y")
+    except ValueError:
+        return date_str.strip()
+
+# Function to clean strings
+def clean_string(text):
+    return text.replace('\\n', ' ').replace('\\t', ' ').strip()
+
+# Create a dictionary with the extracted search terms
+new_search_terms = {
+    "first_name": clean_string(str(row["First Name"])),
+    "last_name": clean_string(str(row["Last Name"])),
+    "id": clean_string(str(row["ID 1"])),
+    "dob": normalize_dob(clean_string(str(row["DOB"]))),
+    "ac_no": clean_string(str(row["AC No."])),
+    "phone": clean_string(str(row["Phone"]))
+}
+
+# Define the search terms by file and sheet
+search_terms_per_file = {
+    local_file_paths[0]: {
+        "Loans": new_search_terms,
+        "CCC": new_search_terms,
+        "REPAID-Loans": new_search_terms,
+        "REPAID- CCC": new_search_terms,
+        "AVK-Loans": new_search_terms,
+        "AVK-CCC": new_search_terms,
+        "F UP DISCONTINUED-Loans": new_search_terms,
+        "F UP DISCONTINUED-CCC": new_search_terms,
+    },
+    local_file_paths[1]: {
+        "CCU DATABASE": new_search_terms,
+        "Repaid": new_search_terms,
+        "w-Off": new_search_terms,
+        "Charge-off": new_search_terms,
+    },
+    local_file_paths[2]: {
+        "Dbase": new_search_terms,
+        "repaid": new_search_terms,        
+    },
+    local_file_paths[3]: {
+        "A19As": new_search_terms,        
+    },
+    local_file_paths[4]: {
+        "A19As": new_search_terms,
+        "BRANCH DEBTS FROM OCT 2016": new_search_terms,
+        "CCC": new_search_terms,
+        "CCC OCT 2016": new_search_terms,        
+    },
+    local_file_paths[5]: {
+        "A19As": new_search_terms,        
+    },
+    local_file_paths[6]: {
+        "A19A": new_search_terms,        
+    },
+    local_file_paths[7]: {
+        "A19A": new_search_terms,        
+    },
+    local_file_paths[8]: {
+        "CCC Mar2006": new_search_terms,
+    },
+    local_file_paths[9]: {
+        "Sheet1": new_search_terms,
+    },
+    local_file_paths[10]: {
+        "JUDGEMENTS DATABASE WORKSHE": new_search_terms,        
+    },
+    local_file_paths[11]: {
+        "WORKING COPY": new_search_terms,
+    },
+}
+
+# Cleaner print statement for search terms
+print("Search Terms:")
+for key, value in new_search_terms.items():
+    print(f"{key.capitalize()}: {value}")
+
+# Cleaner print statement for file names only (without full paths)
+print("\nFiles:")
+for path in local_file_paths:
+    print(os.path.basename(path))
+
 # Function to search for terms in a specific Excel file
 def process_excel_file(file_path, search_terms_per_file):
-	all_results = []
-	try:
-		if file_path.endswith(('.xlsx', '.xlsm')):
-			excel_data = pd.read_excel(file_path, sheet_name=None, engine='openpyxl')	
-		else:
-			excel_data = pd.read_excel(file_path, sheet_name=None, engine='xlrd')	
-		for sheet_name, sheet_data in excel_data.items():
-			cleaned_search_terms = {term_name: clean_string(str(term_value).lower()) for
-			term_name, term_value in search_terms_per_file[file_path].get(sheet_name, {}).items()}
-			headers = list(sheet_data.columns)
-			for index, row in sheet_data.iterrows():
-				found_terms = set()
-				matched_values = {}
-				for term_name, term_value_str in cleaned_search_terms.items():
-					if any(term_value_str in clean_string(str(cell).lower()) for cell in row):
-						found_terms.add(term_name)
-						matched_values[term_name] = term_value_str
-				if len(found_terms) >= 2:
-					result = {
-						"Matched Terms": ', '.join(found_terms),  # Add matched terms here
-						"File": file_path,
-						"File Name": os.path.basename(file_path), # Adding file name here
-						"Sheet": sheet_name,
-						"Row Number": index + 1,
-						"Headers": headers,
-						"Row Data": row.to_dict()
-					}
-					all_results.append(result)
-	except Exception as e:
-		logging.error(f"Error processing {file_path}: {e}")
-	return all_results
+    all_results = []
+    try:
+        if file_path.endswith(('.xlsx', '.xlsm')):
+            excel_data = pd.read_excel(file_path, sheet_name=None, engine='openpyxl')    
+        else:
+            excel_data = pd.read_excel(file_path, sheet_name=None, engine='xlrd')    
+        for sheet_name, sheet_data in excel_data.items():
+            cleaned_search_terms = {term_name: clean_string(str(term_value).lower()) for term_name, term_value in search_terms_per_file[file_path].get(sheet_name, {}).items()}
+            headers = list(sheet_data.columns)
+            for index, row in sheet_data.iterrows():
+                found_terms = set()
+                matched_values = {}
+                for term_name, term_value_str in cleaned_search_terms.items():
+                    if any(term_value_str in clean_string(str(cell).lower()) for cell in row):
+                        found_terms.add(term_name)
+                        matched_values[term_name] = term_value_str
+                if len(found_terms) >= 2:
+                    result = {
+                        "Matched Terms": ', '.join(found_terms),
+                        "File": file_path,
+                        "File Name": os.path.basename(file_path),
+                        "Sheet": sheet_name,
+                        "Row Number": index + 1,
+                        "Headers": headers,
+                        "Row Data": row.to_dict()
+                    }
+                    all_results.append(result)
+    except Exception as e:
+        logging.error(f"Error processing {file_path}: {e}")
+    return all_results
 
-# Writing matched terms and other info to Excel
+# Parallel processing to handle files in batches
+def process_files_in_parallel(file_paths, search_terms_per_file):
+    all_results = []  # Initialize all_results as an empty list to store the results
+    all_results = Parallel(n_jobs=cpu_count() - 1)(
+        delayed(process_excel_file)(file_path, search_terms_per_file) for file_path in file_paths
+    )
+    return [item for sublist in all_results for item in sublist]  # Flatten the list of results
+
+# Execute the parallel processing
+all_results = process_files_in_parallel(local_file_paths, search_terms_per_file)
+
 # Prepare for writing to Excel
 workbook = Workbook()
 sheet = workbook.active
@@ -42,63 +206,59 @@ sheet.title = "Results"
 sheet.append(["Matched Terms", "File", "Sheet", "Row", "-------", "Row Data"])
 
 # Define styles
-header_fill = PatternFill(start_color="0033A0", end_color="0033A0", fill_type="solid") # Dark blue for headers
-data_fill = PatternFill(start_color="D3D3D3", end_color="D3D3D3", fill_type="solid") # Light gray for data
+header_fill = PatternFill(start_color="0033A0", end_color="0033A0", fill_type="solid")  # Dark blue for headers
+data_fill = PatternFill(start_color="D3D3D3", end_color="D3D3D3", fill_type="solid")  # Light gray for data
 header_font = Font(bold=True, color="FFFFFF")
 
 # Define borders
-thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style= 'thin'), bottom=Side(style='thin'))
+thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
 
 # Freeze top row for better navigation
 sheet.freeze_panes = "A2"
 
 # Write data with formatting, starting from Column D, without "Headers" or "Row Data" labels
 for idx, result in enumerate(all_results):
-	row_fill = header_fill if idx % 2 == 0 else data_fill
+    row_fill = header_fill if idx % 2 == 0 else data_fill
 
-	# Write the actual headers and data without labels
-	row_num = sheet.max_row + 1
-	sheet.append([result["Matched Terms"], result["File Name"], result["Sheet"], result["Row Number"], ""] + result["Headers"])
+    # Write the actual headers and data without labels
+    row_num = sheet.max_row + 1
+    sheet.append([result["Matched Terms"], result["File Name"], result["Sheet"], result["Row Number"], ""] + result["Headers"])
 
-	# Add hyperlink to the file path
-	sheet.cell(row=row_num, column=2).hyperlink = result["File"] # Adds hyperlink to cell with the file name
-	sheet.cell(row=row_num, column=2).value = result["File Name"] # Ensures cell shows the file name
+    # Add hyperlink to the file path
+    sheet.cell(row=row_num, column=2).hyperlink = result["File"]  # Adds hyperlink to cell with the file name
+    sheet.cell(row=row_num, column=2).value = result["File Name"]  # Ensures cell shows the file name
 
-	for col_num in range(6, len(result["Headers"]) + 6):
-		cell = sheet.cell(row=row_num, column=col_num)
-		cell.fill = header_fill
-		cell.font = header_font        
-		cell.border = thin_border # Add borders
+    for col_num in range(6, len(result["Headers"]) + 6):
+        cell = sheet.cell(row=row_num, column=col_num)
+        cell.fill = header_fill
+        cell.font = header_font        
+        cell.border = thin_border  # Add borders
         
-	# Write the data row starting from Column D
-	row_num = sheet.max_row + 1
-	sheet.append(["", "", "", "", ""] + list(result["Row Data"].values()))
-	for col_num in range(6, len(result["Row Data"].values()) + 6):
-		cell = sheet.cell(row=row_num, column=col_num)
-		cell.fill = data_fill
-		cell.border = thin_border # Add borders
+    # Write the data row starting from Column D
+    row_num = sheet.max_row + 1
+    sheet.append(["", "", "", "", ""] + list(result["Row Data"].values()))
+    for col_num in range(6, len(result["Row Data"].values()) + 6):
+        cell = sheet.cell(row=row_num, column=col_num)
+        cell.fill = data_fill
+        cell.border = thin_border  # Add borders
 
 # Adjust column widths for better readability
 for col in sheet.columns:
-	max_length = 0
-	column = col[0].column_letter
-	for cell in col:
-		try:
-			if len(str(cell.value)) > max_length:
-				max_length = len(cell.value)
-		except:
-			pass
-	adjusted_width = (max_length + 2) if max_length < 30 else 30
-	sheet.column_dimensions[column].width = adjusted_width
+    max_length = 0
+    column = col[0].column_letter
+    for cell in col:
+        try:
+            if len(str(cell.value)) > max_length:
+                max_length = len(cell.value)
+        except:
+            pass
+    adjusted_width = (max_length + 2) if max_length < 30 else 30
+    sheet.column_dimensions[column].width = adjusted_width
 
 # Save the workbook
 current_time = datetime.now().strftime("%Y-%m-%d %H-%M-%S")
 output_file = f"{current_time} Search_results.xlsx"
 workbook.save(output_file)
-
-# Updated clean print statements for search terms and file paths
-print(f"Search Terms: First Name: {new_search_terms['first_name']}, Last Name: {new_search_terms['last_name']}, ID: {new_search_terms['id']}, DOB: {new_search_terms['dob']}, AC No.: {new_search_terms['ac_no']}, Phone: {new_search_terms['phone']}")
-print(f"Files: {[os.path.basename(path) for path in local_file_paths]}")
 
 # End the timer and calculate the total runtime
 end_time = time.time()
@@ -106,4 +266,3 @@ total_runtime = end_time - start_time
 
 print(f"Total search complete. Results saved to {output_file}")
 print(f"Total Runtime: {total_runtime:.2f} seconds")
-
