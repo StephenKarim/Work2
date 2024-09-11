@@ -1,29 +1,15 @@
-import openpyxl
+import pandas as pd
 
-# Function to copy sheets and paste as values
-def copy_sheets_as_values(source_file, target_file):
-    # Open the source workbook
-    source_wb = openpyxl.load_workbook(source_file, data_only=True)  # data_only=True gets the formula results as values
+# Load and copy all sheets as values
+def copy_excel_as_values_pandas(source_file, target_file):
+    # Read the Excel file
+    xls = pd.read_excel(source_file, sheet_name=None)
     
-    # Create a new workbook for the target file
-    target_wb = openpyxl.Workbook()
-    
-    # Remove the default created sheet in the new workbook
-    if 'Sheet' in target_wb.sheetnames:
-        target_wb.remove(target_wb['Sheet'])
-    
-    # Loop through each sheet in the source workbook
-    for sheet_name in source_wb.sheetnames:
-        source_sheet = source_wb[sheet_name]
-        target_sheet = target_wb.create_sheet(title=sheet_name)
-        
-        # Copy each cell's value from the source sheet to the target sheet
-        for row in source_sheet.iter_rows():
-            for cell in row:
-                target_sheet[cell.coordinate].value = cell.value
-    
-    # Save the new workbook
-    target_wb.save(target_file)
+    # Write each sheet to the new Excel file
+    with pd.ExcelWriter(target_file, engine='openpyxl') as writer:
+        for sheet_name, data in xls.items():
+            data.to_excel(writer, sheet_name=sheet_name, index=False)
+
     print(f"Sheets copied successfully to {target_file}")
 
 # Specify the source and target file paths
@@ -31,4 +17,4 @@ source_file = r"C:\path\to\your\source_file.xls"  # Use your actual .xls file pa
 target_file = r"C:\path\to\your\target_file.xlsx"  # The new .xlsx file you want to create
 
 # Copy the sheets as values
-copy_sheets_as_values(source_file, target_file)
+copy_excel_as_values_pandas(source_file, target_file)
