@@ -21,21 +21,7 @@ start_time = time.time()
 # Define the file paths to search
 file_paths = [
     r"U:\CCU\SharedFolders\A19A\A19(A) Database with AVK\A19(A) DATABASE (branch&ccc) - EXCEL WEF OCT 2018 NEW.xlsx",
-    r"U:\CCU\SharedFolders\DBASE\CCU DBASE\CCU DBASE\CCU_DBASE\1.CCU DBASE 2008 TO 2019 [working].xlsm",
-    r"U:\CCU\SharedFolders\DBASE\CCU DBASE\CCU DBASE\CCU_DBASE\3.CCU DBASE WEF APRIL 2024.xlsx",
-    r"U:\CCU\SharedFolders\A19A\A19(A) Database with AVK\A19A\A19(A) Database with AVK\A19(A)DATABSE-EXCEL W.E.F. JAN2004\A19(A)DATABASE-EXCEL W.E.F. JAN2004.xls",
-    r"U:\CCU\SharedFolders\A19A\A19(A) Database with AVK\A19A\A19(A) Database with AVK\A19(A)DATABASE (branch&ccc) -EXCEL WEF JAN 2004.xls",
-    r"U:\CCU\SharedFolders\Stephen Karim\python_3.4\Scripts\Test\A19(A)DATABASE-EXCEL W.E.F. JAN2004project.xls",
-    r"U:\CCU\SharedFolders\A19A\A19(A) Database with AVK\A19A\A19(A) Database with AVK\A19A(previously in  Access dbase) prior to 2004.xls",
-    r"U:\CCU\SharedFolders\A19A\A19(A) Database with AVK\A19A\A19(A) Database with AVK\A19A(previously in  Access dbase).xls",
-    r"U:\CCU\SharedFolders\A19A\A19(A) Database with AVK\A19A\A19(A) Database with AVK\CCC_A19(A) WEF_MARCH2006.xls",
-    r"U:\CCU\SharedFolders\A19A\A19(A) Database with AVK\A19A\A19(A) Database with AVK\CCCA19ADebts-2005.xls",
-    r"U:\CCU\GroupFolders\Judgement Dbase\JUDGEMENT DATABASE\Judgement Database.xls",
-    r"U:\CCU\GroupFolders\Judgement Dbase\JUDGEMENT DATABASE\Legal Action Database\LEGAL ACTION DATABASE.xls",
-    r"U:\CCU\SharedFolders\DBASE\WRITE OFF-REPAID\Write off-repaid.xls",
-    r"C:\Users\00015221\Desktop\python\Scripts\A19A From Oct 2016.xlsx",
-    r"C:\Users\00015221\Desktop\python\Scripts\2.CCU DBASE WEF JANUARY 2020 copy sheets.xlsx",
-    # Add more file paths as needed (up to 16 files)
+    # Add other paths as needed
 ]
 
 # Define the local directory where the files will be copied to
@@ -69,7 +55,7 @@ local_file_paths = copy_files_to_local(file_paths, local_directory, max_workers=
 # Load the Excel file containing the search terms
 search_terms_df = pd.read_excel(r"C:\Users\00015221\Desktop\python\Scripts\test\Info.xlsx")
 
-# Extract the second row (index 0 in DataFrame)
+# Extract the first row (index 0 in DataFrame)
 row = search_terms_df.iloc[0]
 
 # Function to normalize DOB to a consistent format (dd/mm/yyyy)
@@ -96,134 +82,17 @@ new_search_terms = {
 first_name = new_search_terms.get("first_name", "Unknown")
 last_name = new_search_terms.get("last_name", "Unknown")
 
-# Define the search terms by file and sheet
-search_terms_per_file = {
-    local_file_paths[0]: {
-        "Loans": new_search_terms,
-        "CCC": new_search_terms,
-        "REPAID-Loans": new_search_terms,
-        "REPAID- CCC": new_search_terms,
-        "AVK-Loans": new_search_terms,
-        "AVK-CCC": new_search_terms,
-        "F UP DISCONTINUED-Loans": new_search_terms,
-        "F UP DISCONTINUED-CCC": new_search_terms,
-    },
-    local_file_paths[1]: {
-        "CCU DATABASE": new_search_terms,
-        "Repaid": new_search_terms,
-        "w-Off": new_search_terms,
-        "Charge-off": new_search_terms,
-    },
-    local_file_paths[2]: {
-        "Dbase": new_search_terms,
-        "repaid": new_search_terms,
-    },
-    local_file_paths[3]: {
-        "A19As": new_search_terms,
-    },
-    local_file_paths[4]: {
-        "A19As": new_search_terms,
-        "BRANCH DEBTS FROM OCT 2016": new_search_terms,
-        "CCC": new_search_terms,
-        "CCC OCT 2016": new_search_terms,
-    },
-    local_file_paths[5]: {
-        "A19As": new_search_terms,
-    },
-    local_file_paths[6]: {
-        "A19A": new_search_terms,
-    },
-    local_file_paths[7]: {
-        "A19A": new_search_terms,
-    },
-    local_file_paths[8]: {
-        "CCC Mar2006": new_search_terms,
-    },
-    local_file_paths[9]: {
-        "Sheet1": new_search_terms,
-    },
-    local_file_paths[10]: {
-        "JUDGEMENTS DATABASE WORKSHE": new_search_terms,
-    },
-    local_file_paths[11]: {
-        "WORKING COPY": new_search_terms,
-    },
-    local_file_paths[12]: {
-        "CCU-repaid 00-present": new_search_terms,
-        "FIN- Declassed,Repaid '04-11.05": new_search_terms,
-        "Credit Card": new_search_terms,
-        "SCU repaid 17.01.90 - 2.05.92": new_search_terms,
-        "SCU Repaid 05.92-97": new_search_terms,
-        "SCU ": new_search_terms,
-        "SCU Repaid 1998-1999": new_search_terms,
-        "NCU  92 -": new_search_terms,
-        "NCU  WO&REPAID 98-02": new_search_terms,
-        "SCU WO 87-02": new_search_terms,
-        "SGDE; Arima 89-03-wo": new_search_terms,
-        "WO 1988 -1998": new_search_terms,
-        "write-off-repaid 1999": new_search_terms,
-        "write-off-repaid2000": new_search_terms,
-        "WO 2002": new_search_terms,
-        "WO 2003 Totals": new_search_terms,
-        "WO 2004": new_search_terms,
-        "WO 2005": new_search_terms,
-        "WO 2006 ": new_search_terms,
-        "WO 2007": new_search_terms,
-        "WO 2008": new_search_terms,
-        "WO 2009": new_search_terms,
-        "WO 2010": new_search_terms,
-        "WO 2011": new_search_terms,
-        "WO 2012": new_search_terms,
-        "WO 2013": new_search_terms,
-        "WO 2014": new_search_terms,
-        "WO 2015": new_search_terms,
-    },
-    local_file_paths[13]: {
-        "BRANCH DEBTS": new_search_terms,
-        "CCCF OCT 2016": new_search_terms,
-        "Sheet1": new_search_terms,
-    },
-    local_file_paths[14]: {
-        "CCU DATABASE": new_search_terms,
-        "Repaid": new_search_terms,
-        "w-Off": new_search_terms,
-        "Return to Fincor": new_search_terms,
-        "Declassify": new_search_terms,
-    },
-}
-
-print(f"-----------Search Terms-----------")
-for key, value in new_search_terms.items():
-    print(f"{key.capitalize()}: {value}")
-
-print(f"---------------Files---------------")
-for path in local_file_paths:
-    print(os.path.basename(path))
-
 # Function to search for folders by first and last name in a directory
 def search_folders(directory, first_name, last_name):
     results = []
     for folder in Path(directory).iterdir():
         if folder.is_dir() and first_name.lower() in folder.name.lower() and last_name.lower() in folder.name.lower():
-            results.append(folder)
+            results.append(str(folder))
     return results
 
 # Search for folders matching the first and last name in a specific directory
 folder_search_directory = r"C:\Users\00015221\Desktop\python\Scripts\test_folders"
 matched_folders = search_folders(folder_search_directory, first_name, last_name)
-
-# Function to process matched folders (similar to matched rows)
-def process_folders(matched_folders):
-    folder_results = []
-    for folder in matched_folders:
-        result = {
-            "Folder Name": folder.name,
-            "Folder Path": str(folder)
-        }
-        folder_results.append(result)
-    return folder_results
-
-folder_results = process_folders(matched_folders)
 
 # Function to search for terms in a specific Excel file
 def process_excel_file(file_path, search_terms_per_file):
@@ -265,7 +134,7 @@ def process_files_in_parallel(file_paths, search_terms_per_file):
     return [item for sublist in all_results for item in sublist]
 
 # Execute the parallel processing
-all_results = process_files_in_parallel(local_file_paths, search_terms_per_file)
+all_results = process_files_in_parallel(local_file_paths, new_search_terms)
 
 # Prepare for writing to Excel
 workbook = Workbook()
@@ -273,7 +142,7 @@ sheet = workbook.active
 sheet.title = "Results"
 
 # Add headers for file, sheet, and row
-sheet.append(["File/Folder", "Path"])
+sheet.append(["File/Folder", "Sheet", "Row", "Matched Terms", "Row Data"])
 
 # Define styles
 header_fill = PatternFill(start_color="0033A0", end_color="0033A0", fill_type="solid")  # Dark blue for headers
@@ -283,18 +152,37 @@ thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side
 # Freeze top row for better navigation
 sheet.freeze_panes = "A2"
 
-# Write folder search results to the Excel file
-for result in folder_results:
+# Write file and folder search results to the Excel file
+for idx, result in enumerate(all_results):
     row_num = sheet.max_row + 1
-    sheet.append([result["Folder Name"], result["Folder Path"]])
+    sheet.append([result["File Name"], result["Sheet"], result["Row Number"], str(result["Matched Terms"]), str(result["Row Data"])])
 
-    # Add hyperlink to the folder path
-    sheet.cell(row=row_num, column=2).hyperlink = result["Folder Path"]
-    sheet.cell(row=row_num, column=2).value = result["Folder Name"]
+    # Add hyperlink to the file path
+    sheet.cell(row=row_num, column=1).hyperlink = result["File"]  # Adds hyperlink to cell with the file name
+    sheet.cell(row=row_num, column=1).value = result["File Name"]  # Ensures cell shows the file name
 
-    # Apply formatting
-    sheet.cell(row=row_num, column=2).font = header_font
-    sheet.cell(row=row_num, column=2).border = thin_border
+    for col_num in range(1, 6):  # Assuming the row has 5 columns of data to write
+        cell = sheet.cell(row=row_num, column=col_num)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.border = thin_border
+
+# Also write folder matches (if any)
+if matched_folders:
+    for folder_path in matched_folders:
+        row_num = sheet.max_row + 1
+        folder_name = os.path.basename(folder_path)
+        sheet.append([folder_name, "", "", "", ""])
+
+        # Add hyperlink to the folder path
+        sheet.cell(row=row_num, column=1).hyperlink = folder_path  # Adds hyperlink to cell with the folder path
+        sheet.cell(row=row_num, column=1).value = folder_name  # Ensures cell shows the folder name
+
+        for col_num in range(1, 6):
+            cell = sheet.cell(row=row_num, column=col_num)
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.border = thin_border
 
 # Adjust column widths for better readability
 for col in sheet.columns:
