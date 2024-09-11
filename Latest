@@ -8,6 +8,7 @@ import logging
 from multiprocessing import cpu_count
 from openpyxl import Workbook
 from openpyxl.styles import PatternFill, Border, Side, Font
+from openpyxl.utils import get_column_letter
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -20,7 +21,21 @@ start_time = time.time()
 # Define the file paths to search
 file_paths = [
     r"U:\CCU\SharedFolders\A19A\A19(A) Database with AVK\A19(A) DATABASE (branch&ccc) - EXCEL WEF OCT 2018 NEW.xlsx",
-    # Add other paths as needed
+    r"U:\CCU\SharedFolders\DBASE\CCU DBASE\CCU DBASE\CCU_DBASE\1.CCU DBASE 2008 TO 2019 [working].xlsm",
+    r"U:\CCU\SharedFolders\DBASE\CCU DBASE\CCU DBASE\CCU_DBASE\3.CCU DBASE WEF APRIL 2024.xlsx",
+    r"U:\CCU\SharedFolders\A19A\A19(A) Database with AVK\A19A\A19(A) Database with AVK\A19(A)DATABSE-EXCEL W.E.F. JAN2004\A19(A)DATABASE-EXCEL W.E.F. JAN2004.xls",
+    r"U:\CCU\SharedFolders\A19A\A19(A) Database with AVK\A19A\A19(A) Database with AVK\A19(A)DATABASE (branch&ccc) -EXCEL WEF JAN 2004.xls",
+    r"U:\CCU\SharedFolders\Stephen Karim\python_3.4\Scripts\Test\A19(A)DATABASE-EXCEL W.E.F. JAN2004project.xls",
+    r"U:\CCU\SharedFolders\A19A\A19(A) Database with AVK\A19A\A19(A) Database with AVK\A19A(previously in  Access dbase) prior to 2004.xls",
+    r"U:\CCU\SharedFolders\A19A\A19(A) Database with AVK\A19A\A19(A) Database with AVK\A19A(previously in  Access dbase).xls",
+    r"U:\CCU\SharedFolders\A19A\A19(A) Database with AVK\A19A\A19(A) Database with AVK\CCC_A19(A) WEF_MARCH2006.xls",
+    r"U:\CCU\SharedFolders\A19A\A19(A) Database with AVK\A19A\A19(A) Database with AVK\CCCA19ADebts-2005.xls",
+    r"U:\CCU\GroupFolders\Judgement Dbase\JUDGEMENT DATABASE\Judgement Database.xls",
+    r"U:\CCU\GroupFolders\Judgement Dbase\JUDGEMENT DATABASE\Legal Action Database\LEGAL ACTION DATABASE.xls",
+    r"U:\CCU\SharedFolders\DBASE\WRITE OFF-REPAID\Write off-repaid.xls",
+    r"C:\Users\00015221\Desktop\python\Scripts\A19A From Oct 2016.xlsx",
+    r"C:\Users\00015221\Desktop\python\Scripts\2.CCU DBASE WEF JANUARY 2020 copy sheets.xlsx",
+    # Add more file paths as needed (up to 16 files)
 ]
 
 # Define the local directory where the files will be copied to
@@ -31,17 +46,21 @@ def copy_file(file_path, local_directory):
     file_name = os.path.basename(file_path)
     local_file_path = os.path.join(local_directory, file_name)
     shutil.copy2(file_path, local_file_path)
+    # print(f"Copied {file_name} to {local_file_path}")
     return local_file_path
 
 # Function to copy files in parallel using ThreadPoolExecutor
 def copy_files_to_local(shared_file_paths, local_directory, max_workers=5):
     if not os.path.exists(local_directory):
         os.makedirs(local_directory)
+
+    # Use ThreadPoolExecutor to copy files concurrently
     local_file_paths = []
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = [executor.submit(copy_file, file_path, local_directory) for file_path in shared_file_paths]
         for future in futures:
             local_file_paths.append(future.result())
+
     return local_file_paths
 
 # Copy files using parallel threads
@@ -50,8 +69,15 @@ local_file_paths = copy_files_to_local(file_paths, local_directory, max_workers=
 # Load the Excel file containing the search terms
 search_terms_df = pd.read_excel(r"C:\Users\00015221\Desktop\python\Scripts\test\Info.xlsx")
 
-# Extract the first row (index 0 in DataFrame)
+# Extract the second row (index 0 in DataFrame)
 row = search_terms_df.iloc[0]
+
+# Function to normalize DOB to a consistent format (dd/mm/yyyy)
+def normalize_dob(date_str):
+    try:
+        return datetime.strptime(date_str.strip(), "%d/%m/%Y").strftime("%d/%m/%Y")
+    except ValueError:
+        return date_str.strip()
 
 # Function to clean strings
 def clean_string(text):
@@ -61,16 +87,124 @@ def clean_string(text):
 new_search_terms = {
     "first_name": clean_string(str(row["First Name"])),
     "last_name": clean_string(str(row["Last Name"])),
+    "id": clean_string(str(row["ID 1"])),
+    "dob": normalize_dob(clean_string(str(row["DOB"]))),
+    "ac_no": clean_string(str(row["AC No."])),
+    "phone": clean_string(str(row["Phone"]))
 }
 
-first_name = new_search_terms.get("first_name", "Unknown").lower()
-last_name = new_search_terms.get("last_name", "Unknown").lower()
+first_name = new_search_terms.get("first_name", "Unknown")
+last_name = new_search_terms.get("last_name", "Unknown")
+
+# Define the search terms by file and sheet
+search_terms_per_file = {
+    local_file_paths[0]: {
+        "Loans": new_search_terms,
+        "CCC": new_search_terms,
+        "REPAID-Loans": new_search_terms,
+        "REPAID- CCC": new_search_terms,
+        "AVK-Loans": new_search_terms,
+        "AVK-CCC": new_search_terms,
+        "F UP DISCONTINUED-Loans": new_search_terms,
+        "F UP DISCONTINUED-CCC": new_search_terms,
+    },
+    local_file_paths[1]: {
+        "CCU DATABASE": new_search_terms,
+        "Repaid": new_search_terms,
+        "w-Off": new_search_terms,
+        "Charge-off": new_search_terms,
+    },
+    local_file_paths[2]: {
+        "Dbase": new_search_terms,
+        "repaid": new_search_terms,
+    },
+    local_file_paths[3]: {
+        "A19As": new_search_terms,
+    },
+    local_file_paths[4]: {
+        "A19As": new_search_terms,
+        "BRANCH DEBTS FROM OCT 2016": new_search_terms,
+        "CCC": new_search_terms,
+        "CCC OCT 2016": new_search_terms,
+    },
+    local_file_paths[5]: {
+        "A19As": new_search_terms,
+    },
+    local_file_paths[6]: {
+        "A19A": new_search_terms,
+    },
+    local_file_paths[7]: {
+        "A19A": new_search_terms,
+    },
+    local_file_paths[8]: {
+        "CCC Mar2006": new_search_terms,
+    },
+    local_file_paths[9]: {
+        "Sheet1": new_search_terms,
+    },
+    local_file_paths[10]: {
+        "JUDGEMENTS DATABASE WORKSHE": new_search_terms,
+    },
+    local_file_paths[11]: {
+        "WORKING COPY": new_search_terms,
+    },
+    local_file_paths[12]: {
+        "CCU-repaid 00-present": new_search_terms,
+        "FIN- Declassed,Repaid '04-11.05": new_search_terms,
+        "Credit Card": new_search_terms,
+        "SCU repaid 17.01.90 - 2.05.92": new_search_terms,
+        "SCU Repaid 05.92-97": new_search_terms,
+        "SCU ": new_search_terms,
+        "SCU Repaid 1998-1999": new_search_terms,
+        "NCU  92 -": new_search_terms,
+        "NCU  WO&REPAID 98-02": new_search_terms,
+        "SCU WO 87-02": new_search_terms,
+        "SGDE; Arima 89-03-wo": new_search_terms,
+        "WO 1988 -1998": new_search_terms,
+        "write-off-repaid 1999": new_search_terms,
+        "write-off-repaid2000": new_search_terms,
+        "WO 2002": new_search_terms,
+        "WO 2003 Totals": new_search_terms,
+        "WO 2004": new_search_terms,
+        "WO 2005": new_search_terms,
+        "WO 2006 ": new_search_terms,
+        "WO 2007": new_search_terms,
+        "WO 2008": new_search_terms,
+        "WO 2009": new_search_terms,
+        "WO 2010": new_search_terms,
+        "WO 2011": new_search_terms,
+        "WO 2012": new_search_terms,
+        "WO 2013": new_search_terms,
+        "WO 2014": new_search_terms,
+        "WO 2015": new_search_terms,
+    },
+    local_file_paths[13]: {
+        "BRANCH DEBTS": new_search_terms,
+        "CCCF OCT 2016": new_search_terms,
+        "Sheet1": new_search_terms,
+    },
+    local_file_paths[14]: {
+        "CCU DATABASE": new_search_terms,
+        "Repaid": new_search_terms,
+        "w-Off": new_search_terms,
+        "Return to Fincor": new_search_terms,
+        "Declassify": new_search_terms,
+    },
+}
+
+print(f"-----------Search Terms-----------")
+for key, value in new_search_terms.items():
+    print(f"{key.capitalize()}: {value}")
+
+print(f"---------------Files---------------")
+for path in local_file_paths:
+    print(os.path.basename(path))
 
 # Function to search for folders by first and last name in a directory
 def search_folders(directory, first_name, last_name):
     results = []
     for folder in Path(directory).iterdir():
-        if folder.is_dir() and first_name in folder.name.lower() and last_name in folder.name.lower():
+        if folder.is_dir() and first_name.lower() in folder.name.lower() and last_name.lower() in folder.name.lower():
             results.append(folder)
     return results
 
@@ -91,28 +225,58 @@ def process_folders(matched_folders):
 
 folder_results = process_folders(matched_folders)
 
-# Parallel processing to handle files in batches (existing file processing logic)
+# Function to search for terms in a specific Excel file
 def process_excel_file(file_path, search_terms_per_file):
     all_results = []
-    # Logic for processing files goes here (same as before)
+    try:
+        if file_path.endswith('.xls'):
+            excel_data = pd.read_excel(file_path, sheet_name=None, engine='xlrd')
+        else:
+            excel_data = pd.read_excel(file_path, sheet_name=None, engine='openpyxl')
+        for sheet_name, sheet_data in excel_data.items():
+            cleaned_search_terms = {term_name: clean_string(str(term_value).lower()) for
+                                    term_name, term_value in search_terms_per_file[file_path].get(sheet_name, {}).items()}
+            headers = list(sheet_data.columns)
+            for index, row in sheet_data.iterrows():
+                found_terms = set()
+                matched_values = {}
+                for term_name, term_value_str in cleaned_search_terms.items():
+                    if any(term_value_str in clean_string(str(cell).lower()) for cell in row):
+                        found_terms.add(term_name)
+                        matched_values[term_name] = term_value_str
+                if len(found_terms) >= 2:
+                    result = {
+                        "Matched Terms": matched_values,
+                        "File": file_path,
+                        "File Name": os.path.basename(file_path),  # Adding file name here
+                        "Sheet": sheet_name,
+                        "Row Number": index + 1,
+                        "Headers": headers,
+                        "Row Data": row.to_dict()
+                    }
+                    all_results.append(result)
+    except Exception as e:
+        logging.error(f"Error processing {file_path}: {e}")
     return all_results
 
+# Parallel processing to handle files in batches
 def process_files_in_parallel(file_paths, search_terms_per_file):
     all_results = Parallel(n_jobs=cpu_count() - 1)(delayed(process_excel_file)(file_path, search_terms_per_file) for file_path in file_paths)
     return [item for sublist in all_results for item in sublist]
 
-all_results = process_files_in_parallel(local_file_paths, new_search_terms)
+# Execute the parallel processing
+all_results = process_files_in_parallel(local_file_paths, search_terms_per_file)
 
 # Prepare for writing to Excel
 workbook = Workbook()
 sheet = workbook.active
 sheet.title = "Results"
 
-# Add headers for file, folder, and row
+# Add headers for file, sheet, and row
 sheet.append(["File/Folder", "Path"])
 
 # Define styles
-header_fill = PatternFill(start_color="0033A0", end_color="0033A0", fill_type="solid") # Dark blue for headers
+header_fill = PatternFill(start_color="0033A0", end_color="0033A0", fill_type="solid")  # Dark blue for headers
 header_font = Font(bold=True, color="FFFFFF")
 thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
 
@@ -123,14 +287,27 @@ sheet.freeze_panes = "A2"
 for result in folder_results:
     row_num = sheet.max_row + 1
     sheet.append([result["Folder Name"], result["Folder Path"]])
-    
+
     # Add hyperlink to the folder path
     sheet.cell(row=row_num, column=2).hyperlink = result["Folder Path"]
     sheet.cell(row=row_num, column=2).value = result["Folder Name"]
-    
+
     # Apply formatting
     sheet.cell(row=row_num, column=2).font = header_font
     sheet.cell(row=row_num, column=2).border = thin_border
+
+# Adjust column widths for better readability
+for col in sheet.columns:
+    max_length = 0
+    column = col[0].column_letter
+    for cell in col:
+        try:
+            if len(str(cell.value)) > max_length:
+                max_length = len(cell.value)
+        except:
+            pass
+    adjusted_width = (max_length + 2) if max_length < 30 else 30
+    sheet.column_dimensions[column].width = adjusted_width
 
 # Save the workbook
 current_time = datetime.now().strftime("%Y-%m-%d %H-%M-%S")
