@@ -1,0 +1,21 @@
+if matched_folders:
+    for folder_path in matched_folders:
+        # Append the folder name first, then adjust the row number correctly
+        folder_name = os.path.basename(folder_path)
+        sheet.append([folder_name, "", "", "", ""])
+
+        # Adjust the row number after appending
+        row_num = sheet.max_row
+
+        # Add hyperlink to the folder path and highlight the folder name cell
+        cell = sheet.cell(row=row_num, column=1)
+
+        # Properly format the folder path as a hyperlink
+        if os.path.exists(folder_path):  # Ensure the folder exists
+            cell.hyperlink = f"file:///{folder_path}"  # Use proper file hyperlink format
+        else:
+            logging.warning(f"Folder does not exist: {folder_path}")
+
+        cell.value = folder_name
+        cell.fill = folder_fill
+        cell.font = folder_font
