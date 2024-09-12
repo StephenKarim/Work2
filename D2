@@ -1,0 +1,27 @@
+from office365.sharepoint.client_context import ClientContext
+from office365.runtime.auth.client_credential import ClientCredential
+from office365.runtime.auth.user_credential import UserCredential
+import pandas as pd
+import io
+
+# SharePoint site and credentials
+sharepoint_site_url = "https://yourcompany.sharepoint.com/sites/yoursite"
+username = "your_email@yourcompany.com"
+password = "your_password"
+
+# Excel file URL in SharePoint (SharePoint link to the file)
+file_url = "/sites/yoursite/Shared%20Documents/Folder/yourfile.xlsx"
+
+# Authentication
+ctx = ClientContext(sharepoint_site_url).with_credentials(UserCredential(username, password))
+
+# Download the file
+response = ctx.web.get_file_by_server_relative_url(file_url).download().execute_query()
+
+# Convert the file content to an Excel DataFrame using pandas
+excel_data = pd.read_excel(io.BytesIO(response.content))
+
+# Save to a local file or process as needed
+excel_data.to_excel("downloaded_file.xlsx", index=False)
+
+print("File downloaded and saved as 'downloaded_file.xlsx'")
