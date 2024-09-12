@@ -1,0 +1,36 @@
+from office365.sharepoint.client_context import ClientContext
+from office365.runtime.auth.user_credential import UserCredential
+import pandas as pd
+import io
+from dotenv import load_dotenv
+import os
+
+# Load environment variables from the .env file
+load_dotenv()
+
+# Get credentials and SharePoint site information from the environment variables
+sharepoint_site_url = os.getenv("SHAREPOINT_SITE_URL")
+username = os.getenv("SHAREPOINT_USERNAME")
+password = os.getenv("SHAREPOINT_PASSWORD")
+file_url = os.getenv("SHAREPOINT_FILE_URL")
+
+# Authentication
+ctx = ClientContext(sharepoint_site_url).with_credentials(UserCredential(username, password))
+
+# Create an in-memory BytesIO object to store the file content
+file_object = io.BytesIO()
+
+# Download the file content into the BytesIO object
+file = ctx.web.get_file_by_server_relative_url(file_url)
+file.download(file_object).execute_query()
+
+# Move the cursor back to the beginning of the BytesIO object
+file_object.seek(0)
+
+# Load the Excel file content into a pandas DataFrame
+excel_data = pd.read_excel(file_object)
+
+# Save to a local file or process as needed
+excel_data.to_excel("downloaded_file.xlsx", index=False)
+
+print("File downloaded and saved as 'downloaded_file.xlsx'")
