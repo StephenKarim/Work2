@@ -1,0 +1,35 @@
+from office365.sharepoint.client_context import ClientContext
+from office365.runtime.auth.user_credential import UserCredential
+import pandas as pd
+import io
+from dotenv import load_dotenv
+import os
+
+# Load environment variables from the .env file
+load_dotenv()
+
+# Get credentials and SharePoint site information from the environment variables
+sharepoint_site_url = os.getenv("SHAREPOINT_SITE_URL")
+username = os.getenv("SHAREPOINT_USERNAME")
+password = os.getenv("SHAREPOINT_PASSWORD")
+file_url = os.getenv("SHAREPOINT_FILE_URL")
+
+# Authentication
+ctx = ClientContext(sharepoint_site_url).with_credentials(UserCredential(username, password))
+
+# Download the file
+response = ctx.web.get_file_by_server_relative_url(file_url).download().execute_query()
+
+# Convert the file content to an Excel DataFrame using pandas
+excel_data = pd.read_excel(io.BytesIO(response.content))
+
+# Save to a local file or process as needed
+excel_data.to_excel("downloaded_file.xlsx", index=False)
+
+print("File downloaded and saved as 'downloaded_file.xlsx'")
+
+
+SHAREPOINT_SITE_URL=https://yourcompany.sharepoint.com/sites/yoursite
+SHAREPOINT_USERNAME=your_email@yourcompany.com
+SHAREPOINT_PASSWORD=your_password
+SHAREPOINT_FILE_URL=/sites/yoursite/Shared%20Documents/Folder/yourfile.xlsx
