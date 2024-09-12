@@ -1,0 +1,342 @@
+import customtkinter as ctk
+import pandas as pd
+import time
+from joblib import Parallel, delayed
+from datetime import datetime
+import os
+import shutil
+import logging
+from multiprocessing import cpu_count
+from openpyxl import Workbook, load_workbook
+from openpyxl.styles import PatternFill, Border, Side, Font
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+
+# Set up logging
+logging.basicConfig(filename='process_log.log', level=logging.INFO)
+
+# Start the timer for the total process
+start_time = time.time()
+
+# Define the file paths to search (Home values)
+file_paths = [
+    r"C:\Users\Stephen\Documents\1. A Work\Test area\Folder 1\large_test_file_1.xlsx",
+    r"C:\Users\Stephen\Documents\1. A Work\Test area\Folder 1\large_test_file_2.xlsx",
+    r"C:\Users\Stephen\Documents\1. A Work\Test area\Folder 1\large_test_file_3.xlsx",
+]
+
+# Define the local directory where the files will be copied to (Home value)
+local_directory = r"C:\Users\Stephen\Documents\1. A Work\python-full-3.12.5-windows-x86_64\python-full-3.12.5-windows-x86_64\Scripts\Copies"
+
+# Function to copy a single file
+def copy_file(file_path, local_directory):
+    file_name = os.path.basename(file_path)
+    local_file_path = os.path.join(local_directory, file_name)
+    shutil.copy2(file_path, local_file_path)
+    return local_file_path
+
+# Function to copy files in parallel using ThreadPoolExecutor
+def copy_files_to_local(shared_file_paths, local_directory, max_workers=5):
+    if not os.path.exists(local_directory):
+        os.makedirs(local_directory)
+
+    local_file_paths = []
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = [executor.submit(copy_file, file_path, local_directory) for file_path in shared_file_paths]
+        for future in futures:
+            local_file_paths.append(future.result())
+
+    return local_file_paths
+
+# Copy files using parallel threads
+local_file_paths = copy_files_to_local(file_paths, local_directory, max_workers=5)
+
+# UI for entering search terms
+class SearchTermsUI(ctk.CTk):
+    def __init__(self):
+        super().__init__()
+
+        self.title("Enter Search Terms")
+        self.geometry("400x400")
+
+        self.first_name_var = ctk.StringVar()
+        self.last_name_var = ctk.StringVar()
+        self.id_var = ctk.StringVar()
+        self.dob_var = ctk.StringVar()
+        self.ac_no_var = ctk.StringVar()
+        self.phone_var = ctk.StringVar()
+
+        # Create input fields
+        self.create_input("First Name", self.first_name_var, 0)
+        self.create_input("Last Name", self.last_name_var, 1)
+        self.create_input("ID", self.id_var, 2)
+        self.create_input("DOB (dd/mm/yyyy)", self.dob_var, 3)
+        self.create_input("Account Number", self.ac_no_var, 4)
+        self.create_input("Phone", self.phone_var, 5)
+
+        # Submit button
+        submit_button = ctk.CTkButton(self, text="Submit", command=self.submit_search_terms)
+        submit_button.grid(row=6, column=1, pady=10)
+
+    def create_input(self, label_text, variable, row):
+        label = ctk.CTkLabel(self, text=label_text)
+        label.grid(row=row, column=0, padx=10, pady=10)
+        entry = ctk.CTkEntry(self, textvariable=variable)
+        entry.grid(row=row, column=1, padx=10, pady=10)
+
+    def submit_search_terms(self):
+        global new_search_terms
+
+        # Create a temporary dictionary with all inputs
+        temp_search_terms = {
+            "first_name": self.first_name_var.get().strip(),
+            "last_name": self.last_name_var.get().strip(),
+            "id": self.id_var.get().strip(),
+            "dob": self.dob_var.get().strip(),
+            "ac_no": self.ac_no_var.get().strip(),
+            "phone": self.phone_var.get().strip()
+        }
+
+        # Only add non-empty entries to new_search_terms
+        new_search_terms = {key: value for key, value in temp_search_terms.items() if value}
+
+        # Close the UI
+        self.destroy()
+
+# Run the UI to collect search terms
+app = SearchTermsUI()
+app.mainloop()
+
+# Print the search terms
+first_name = new_search_terms.get("first_name", "Unknown")
+last_name = new_search_terms.get("last_name", "Unknown")
+
+print(f"-----------Search Terms-----------")
+for key, value in new_search_terms.items():
+    print(f"{key.capitalize()}: {value}")
+    
+# Define the search terms by file and sheet (Home values)
+search_terms_per_file = {
+    local_file_paths[0]: {
+        "Sheet1": new_search_terms,
+        "Sheet2": new_search_terms,       
+    },
+    local_file_paths[1]: {
+        "Sheet1": new_search_terms,     
+    },
+    local_file_paths[2]: {
+        "Sheet1": new_search_terms,     
+    },
+}
+
+# Print the files to be processed
+print(f"---------------Files---------------")
+for path in local_file_paths:
+    print(os.path.basename(path))
+
+# Function to search for folders by first and last name in a directory (Home value)
+def search_folders(directory, first_name, last_name):
+    results = []
+    for folder in Path(directory).iterdir():
+        if folder.is_dir() and first_name.lower() in folder.name.lower() and last_name.lower() in folder.name.lower():
+            results.append(folder)
+    return results
+
+# Function to format and write matched terms with || as a separator
+def write_matched_terms(sheet, row_num, col_num, matched_terms):
+    formatted_terms = []
+    for key, value in matched_terms.items():
+        formatted_key = key.replace('_', ' ').title()
+        formatted_value = str(value).capitalize()
+        formatted_terms.append(f"{formatted_key}: {formatted_value}")
+
+    # Join formatted terms with || separator
+    formatted_string = " || ".join(formatted_terms)
+    sheet.cell(row=row_num, column=col_num).value = formatted_string
+
+# Function to search for terms in a specific Excel file
+def process_excel_file(file_path, search_terms_per_file):
+    all_results = []
+    try:
+        if file_path.endswith('.xls'):
+            excel_data = pd.read_excel(file_path, sheet_name=None, engine='xlrd')
+        else:
+            excel_data = pd.read_excel(file_path, sheet_name=None, engine='openpyxl')
+        for sheet_name, sheet_data in excel_data.items():
+            cleaned_search_terms = {term_name: str(term_value).lower().strip() for term_name, term_value in search_terms_per_file[file_path].get(sheet_name, {}).items()}
+            headers = list(sheet_data.columns)
+            for index, row in sheet_data.iterrows():
+                found_terms = set()
+                matched_values = {}
+                for term_name, term_value_str in cleaned_search_terms.items():
+                    if any(term_value_str in str(cell).lower().strip() for cell in row):
+                        found_terms.add(term_name)
+                        matched_values[term_name] = term_value_str
+                if len(found_terms) >= 2:
+                    result = {
+                        "Matched Terms": matched_values,
+                        "File": file_path,
+                        "File Name": os.path.basename(file_path),
+                        "Sheet": sheet_name,
+                        "Row Number": index + 1,
+                        "Headers": headers,
+                        "Row Data": row.to_dict(),
+                        "Matched Row Data": matched_values
+                    }
+                    all_results.append(result)
+    except Exception as e:
+        logging.error(f"Error processing {file_path}: {e}")
+    return all_results
+
+# Parallel processing to handle files in batches
+def process_files_in_parallel(file_paths, search_terms_per_file):
+    all_results = Parallel(n_jobs=cpu_count() - 1)(delayed(process_excel_file)(file_path, search_terms_per_file) for file_path in file_paths)
+    return [item for sublist in all_results for item in sublist]
+
+# Execute the parallel processing
+all_results = process_files_in_parallel(local_file_paths, search_terms_per_file)
+
+# Prepare for writing to Excel
+workbook = Workbook()
+sheet = workbook.active
+sheet.title = "Results"
+
+# Add headers for file, sheet, and row
+sheet.append(["File/Folder", "Sheet", "Row", "Matched Terms", "Row Data"])
+
+# Define styles
+header_fill = PatternFill(start_color="1e99c6", end_color="1e99c6", fill_type="solid")  # New blue for headers
+folder_fill = PatternFill(start_color="95348D", end_color="95348D", fill_type="solid")  # Purple for folder match
+folder_font = Font(bold=True, color="FFFFFF")  # White bold font for folder match
+header_font = Font(bold=True, color="FFFFFF")
+thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
+
+# Define bottom border only
+bottom_border = Border(bottom=Side(style='thin'))
+
+# Freeze top row for better navigation
+sheet.freeze_panes = "A2"
+
+# Write file and folder search results to the Excel file
+for idx, result in enumerate(all_results):
+    row_num = sheet.max_row + 1
+    
+    # Append the basic information (File, Sheet, Row)
+    sheet.append([result["File Name"], result["Sheet"], result["Row Number"], ""])
+
+    # Add hyperlink to the file path for file name
+    file_cell = sheet.cell(row=row_num, column=1)
+    file_cell.hyperlink = result["File"]
+    file_cell.value = result["File Name"]
+
+    # Write the matched terms using the custom function
+    write_matched_terms(sheet, row_num, 4, result["Matched Terms"])
+
+    # Write the row data headers (blue) and values
+    headers = result["Headers"]
+    row_data = list(result["Row Data"].values())
+
+    # Write row data headers
+    for col_num, header in enumerate(headers, start=5):
+        cell = sheet.cell(row=row_num, column=col_num)
+        cell.value = header
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.border = thin_border
+
+    # Write row data values on the next row
+    row_num += 1
+    for col_num, data_value in enumerate(row_data, start=5):
+        cell = sheet.cell(row=row_num, column=col_num)
+        cell.value = data_value
+        cell.border = thin_border
+
+    # Add a bottom border after each data block
+    for col_num in range(1, 6):  # Assuming columns A to E
+        cell = sheet.cell(row=row_num, column=col_num)
+        cell.border = bottom_border
+
+# Also write folder matches (if any)
+folder_search_directory = r"C:\Users\Stephen\Documents\1. A Work\python-full-3.12.5-windows-x86_64\python-full-3.12.5-windows-x86_64\Scripts\Folder Search"
+matched_folders = search_folders(folder_search_directory, first_name, last_name)
+
+if matched_folders:
+    for folder_path in matched_folders:
+        row_num = sheet.max_row + 1
+        folder_name = os.path.basename(folder_path)
+        sheet.append([folder_name, "", "", "", ""])
+
+        # Add hyperlink to the folder path and highlight the folder name cell
+        cell = sheet.cell(row=row_num, column=1)
+        cell.hyperlink = str(folder_path)
+        cell.value = folder_name
+        cell.fill = folder_fill
+        cell.font = folder_font
+
+# Save the workbook (before doing the second pass)
+current_time = datetime.now().strftime("%Y-%m-%d %H-%M-%S")
+output_file = f"{first_name}_{last_name}_{current_time} Search_results.xlsx"
+workbook.save(output_file)
+
+# Second pass to highlight matched terms after the file is created
+wb = load_workbook(output_file)
+sheet = wb.active
+
+# Insert two rows at the top
+sheet.insert_rows(1, 2)
+
+# Define the fill for the searched terms header (blue fill as an example)
+searched_terms_fill = PatternFill(start_color="1e99c6", end_color="1e99c6", fill_type="solid")
+searched_terms_font = Font(bold=True, color="FFFFFF")
+
+# Define the fill for matched terms (orange fill as requested)
+highlight_fill = PatternFill(start_color="F78C2B", end_color="F78C2B", fill_type="solid")
+highlight_fill_magenta = PatternFill(start_color="C93593", end_color="C93593", fill_type="solid")
+highlight_font = Font(bold=True, color="FFFFFF")  # Bold and white for highlighted text
+
+# Define the fill and font for the header row (blue fill with white bold text)
+header_fill = PatternFill(start_color="1e99c6", end_color="1e99c6", fill_type="solid")
+header_font = Font(bold=True, color="FFFFFF")
+
+# Write the header for "Searched Terms"
+sheet.cell(row=1, column=1).value = "Searched Terms"
+sheet.cell(row=1, column=1).fill = searched_terms_fill
+sheet.cell(row=1, column=1).font = searched_terms_font
+sheet.merge_cells(start_row=1, start_column=1, end_row=1, end_column=4)  # Merge from A to D
+
+# Write the search terms with the same formatting as matched terms
+formatted_search_terms = []
+for key, value in new_search_terms.items():
+    formatted_key = key.replace('_', ' ').title()
+    formatted_value = str(value).capitalize()
+    formatted_search_terms.append(f"{formatted_key}: {formatted_value}")
+
+# Join formatted terms with ' || ' separator
+formatted_search_terms_string = " || ".join(formatted_search_terms)
+sheet.cell(row=2, column=1).value = formatted_search_terms_string
+sheet.cell(row=2, column=1).fill = highlight_fill_magenta
+sheet.cell(row=2, column=1).font = highlight_font  # Apply bold and white text to search terms
+sheet.merge_cells(start_row=2, start_column=1, end_row=2, end_column=4)  # Merge from A to D
+
+# Highlight the row with headers (File/Folder, Sheet, Row, Matched Terms, Row Data)
+header_row = sheet[3]  # Assuming row 3 contains these headers
+for cell in header_row:
+    cell.fill = header_fill
+    cell.font = header_font
+
+# Go through each row and highlight matched terms
+for row in sheet.iter_rows(min_row=4, min_col=5, max_col=sheet.max_column):
+    for cell in row:
+        if str(cell.value).strip().lower() in [str(val).strip().lower() for val in new_search_terms.values()]:
+            cell.fill = highlight_fill
+            cell.font = highlight_font  # Apply bold and white text to matched terms
+
+# Save the workbook with highlights and inserted rows
+wb.save(output_file)
+
+# End the timer and calculate the total runtime
+end_time = time.time()
+total_runtime = end_time - start_time
+
+print(f"---------Total search complete. Results saved to {output_file}")
+print(f"---------Total Runtime: {total_runtime:.2f} seconds")
