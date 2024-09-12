@@ -1,0 +1,18 @@
+from office365.sharepoint.client_context import ClientContext
+from office365.runtime.auth.user_credential import UserCredential
+import os
+
+# SharePoint site and credentials
+site_url = "https://yourcompany.sharepoint.com/sites/yoursite"
+username = "your_work_email@yourcompany.com"
+password = "your_password"  # Ideally, you should use a secure method to store/retrieve the password
+relative_file_url = "/sites/yoursite/Shared%20Documents/yourfolder/yourfile.xlsx"  # File path in SharePoint
+local_path = r"C:\Users\yourusername\Desktop\yourfile.xlsx"  # Local path to save the file
+
+# Authenticate and create a context
+ctx = ClientContext(site_url).with_credentials(UserCredential(username, password))
+
+# Download the file
+response = ctx.web.get_file_by_server_relative_url(relative_file_url).download(local_path).execute_query()
+
+print(f"File downloaded to: {local_path}")
