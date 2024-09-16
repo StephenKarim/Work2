@@ -1,0 +1,48 @@
+Here’s a summary of the code features, grouped logically for a presentation with 3 points per slide:
+
+### **Slide 1: Core Features (Part 1)**
+1. **Parallel File Copying**: Files are copied in parallel using multithreading, maximizing system resources by adjusting the number of threads based on available CPU cores.
+   
+2. **User-Friendly Search Terms UI**: A custom GUI built with `customtkinter` allows users to input search terms (name, ID, DOB, etc.), with real-time input validation and keyboard shortcuts for efficiency.
+
+3. **Excel File Searching**: The script reads Excel files, searches through rows for matching terms, and processes multiple sheets per file based on predefined mappings of search terms.
+
+---
+
+### **Slide 2: Core Features (Part 2)**
+1. **Optimized Search with `.apply()`**: Uses Pandas’ `.apply()` method to vectorize and speed up row searching for large datasets.
+
+2. **Parallel File Processing**: Multiple Excel files are processed in parallel using `joblib.Parallel`, allowing for faster searches across files.
+
+3. **Folder Search**: The script can search through folders in a specified directory to find name matches, linking these to the Excel output file.
+
+---
+
+### **Slide 3: Output and Formatting**
+1. **Formatted Excel Output**: The search results are saved in an Excel file with custom formatting (color-coded cells, borders, and merged headers) for readability.
+
+2. **Search Term Highlighting**: Matching search terms are highlighted in the output Excel file, using distinct colors for easy identification.
+
+3. **Freezing Excel Header Rows**: The top rows of the Excel file (containing search terms and headers) are frozen for easy scrolling and reference during data review.
+
+---
+
+### **Slide 4: Extra Features & Optimizations**
+1. **Undo/Redo Functionality**: The UI supports undo and redo for each input field, allowing users to revert or restore changes with `Ctrl+Z` and `Ctrl+Y`.
+
+2. **Dynamic Thread Allocation**: Both file copying and file searching dynamically adjust thread usage based on system resources, optimizing performance without overloading the system.
+
+3. **Error Logging**: Any issues during processing are recorded in a log file (`process_log.log`), simplifying troubleshooting and debugging.
+
+---
+
+### **Slide 5: User Experience Enhancements**
+1. **Real-Time Input Capitalization**: First and last names are automatically capitalized in real-time, ensuring consistency in the user’s inputs.
+
+2. **Keyboard Shortcuts**: The UI supports common keyboard shortcuts like pressing "Enter" to submit and `Ctrl+Z` for undo, enhancing user productivity.
+
+3. **Centered Window & Focus**: The GUI automatically centers on the screen and autofocuses on the first input field, providing a polished user experience.
+
+---
+
+This structure groups the features logically while maintaining clarity for your audience. Each slide covers critical aspects of the script, demonstrating its functionality and optimization.
