@@ -490,7 +490,7 @@ def ask_open_file(file_path):
     # Call CTkMessagebox directly
     msg = CTkMessagebox(
         title="File Created",  
-        message = f"File Created Successfully\nFile Name: '{os.path.basename(file_path)}'\nWould you like to open the file now?",  
+        message = f"File Created Successfully\n\nDEBTOR: {first_name} {last_name}\n\nWould you like to open the file now?",  
         icon="question",  
         option_1="No, Thanks",  
         option_2="Yes, Open",          
