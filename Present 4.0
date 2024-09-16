@@ -1,0 +1,77 @@
+Got it! Let's focus on what makes the code great and categorize its main strengths, while keeping the quality of life features in a separate section. Here’s a refined structure:
+
+---
+
+### **Slide 1: Core Functional Features**
+1. **Parallel File Copying**: 
+   - Uses multithreading to copy files in parallel based on CPU resources, significantly speeding up the file transfer process.
+   
+2. **Parallel Excel File Processing**:
+   - Multiple Excel files are processed concurrently using `joblib.Parallel`, utilizing available CPU cores to handle large datasets efficiently.
+
+3. **Excel Search Functionality**:
+   - The script searches for specific terms across multiple Excel sheets within each file, processing large volumes of data to find relevant matches.
+
+---
+
+### **Slide 2: Enhanced Data Handling & Search**
+1. **Optimized Row Searching with `.apply()`**:
+   - The `.apply()` function in Pandas vectorizes the search logic, making row-by-row searching faster and more efficient.
+   
+2. **Search Terms Flexibility**:
+   - Only non-empty fields from the user input are used as search terms, ensuring that the search process focuses on relevant terms and avoids unnecessary checks.
+
+3. **Folder Search**:
+   - In addition to searching Excel files, the script also searches through folder names in a directory, expanding its functionality beyond just file content searches.
+
+---
+
+### **Slide 3: Output and Reporting Features**
+1. **Formatted Excel Output**:
+   - Search results are written into an Excel file with professional formatting, including color-coded cells, borders, and merged headers, making it easy for users to interpret results.
+   
+2. **Search Term Highlighting**:
+   - Matched search terms are highlighted in the Excel output, allowing users to quickly identify relevant information.
+
+3. **Excel Header Freezing**:
+   - The headers and search terms in the output file are frozen, making it easier to scroll through large datasets while keeping important information visible.
+
+---
+
+### **Slide 4: Performance Enhancements**
+1. **Dynamic Thread Allocation**:
+   - Both file copying and Excel searching dynamically adjust the number of threads based on available CPU resources, optimizing performance and avoiding system overload.
+   
+2. **Efficient Search Logic**:
+   - The script’s use of `.apply()` for search operations and dynamic thread allocation reduces processing time, even for large datasets and files.
+
+3. **Logging for Error Handling**:
+   - The script logs errors in a dedicated log file, making troubleshooting easier and ensuring that the process remains stable during execution.
+
+---
+
+### **Slide 5: Quality of Life Features**
+1. **User-Friendly Search Terms UI**:
+   - An intuitive GUI allows users to easily input search terms (e.g., first name, last name, ID), with real-time input validation and common keyboard shortcuts like `Enter` for submission and `Ctrl+Z`/`Ctrl+Y` for undo/redo.
+
+2. **Real-Time Input Capitalization**:
+   - Automatically capitalizes first and last names as users type, ensuring consistent input formatting.
+
+3. **Undo/Redo and Keyboard Shortcuts**:
+   - The interface supports undo and redo functionality with `Ctrl+Z` and `Ctrl+Y`, along with keyboard shortcuts that improve user interaction.
+
+---
+
+### **Slide 6: Overall Impact on Performance**
+1. **Improved Efficiency**:
+   - By leveraging parallelism in both file copying and search operations, the code significantly reduces overall processing time, especially for large datasets.
+   
+2. **Scalable Across Systems**:
+   - The dynamic adjustment of threads based on CPU capacity ensures the code can scale efficiently on different systems, from standard laptops to high-performance machines.
+
+3. **Optimized Data Processing**:
+   - Efficient use of Pandas functions (`.apply()`), streamlined search logic, and file handling ensures that the code runs quickly, even when handling thousands of rows and multiple files.
+
+---
+
+This structure keeps the focus on what makes the code great—efficient data processing, parallelization, and high performance—while also highlighting its user-friendly aspects. By separating the **core functionality**, **performance enhancements**, and **quality of life** features, you can present the value and impact of the code more clearly.
