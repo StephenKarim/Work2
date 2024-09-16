@@ -1,0 +1,152 @@
+import sqlite3
+import pandas as pd
+from openpyxl import Workbook, load_workbook
+from openpyxl.styles import PatternFill, Border, Side, Font
+from datetime import datetime
+import time
+import os
+
+# Function to search the SQLite database for matching rows
+def search_database(search_terms, conn):
+    tables = pd.read_sql("SELECT name FROM sqlite_master WHERE type='table';", conn)
+    all_results = []
+    
+    for table_name in tables['name']:
+        try:
+            df = pd.read_sql(f"SELECT * FROM '{table_name}'", conn)
+            matched_rows = df[df.apply(lambda row: sum(any(str(term).lower() in str(cell).lower() for cell in row) for term in search_terms) >= 2, axis=1)]
+            
+            if not matched_rows.empty:
+                matched_rows = matched_rows.copy()
+                matched_rows.loc[:, 'source_table'] = table_name  # Keep track of the source table
+                all_results.append(matched_rows)
+        except Exception as e:
+            print(f"Error querying table {table_name}: {e}")
+    
+    if all_results:
+        return pd.concat(all_results, ignore_index=True)
+    else:
+        return pd.DataFrame()  # Empty DataFrame if no results
+
+# Function to search for folders by first and last name in a directory
+def search_folders(directory, first_name, last_name):
+    results = []
+    try:
+        for folder in os.listdir(directory):
+            folder_path = os.path.join(directory, folder)
+            if os.path.isdir(folder_path) and first_name.lower() in folder.lower() and last_name.lower() in folder.lower():
+                results.append(folder_path)
+    except FileNotFoundError:
+        print(f"Directory '{directory}' not found. Skipping folder search.")
+    return results
+
+# Function to write matched search terms into Excel with || separator
+def write_matched_terms(sheet, row_num, col_num, matched_terms):
+    formatted_terms = " || ".join([f"{key.replace('_', ' ').title()}: {value}" for key, value in matched_terms.items()])
+    sheet.cell(row=row_num, column=col_num).value = formatted_terms
+
+# Function to write search results into Excel, replicating the previous layout
+def write_search_results_to_excel(results, output_file, search_terms):
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Results"
+    
+    # Insert two rows for the search terms
+    sheet.insert_rows(1, 2)
+    
+    # Styles
+    header_fill_blue = PatternFill(start_color="1e99c6", end_color="1e99c6", fill_type="solid")
+    folder_fill_purple = PatternFill(start_color="95348D", end_color="95348D", fill_type="solid")
+    highlight_fill_magenta = PatternFill(start_color="C93593", end_color="C93593", fill_type="solid")
+    header_font_white = Font(bold=True, color="FFFFFF")
+    
+    # Header for searched terms
+    sheet.cell(row=1, column=1).value = "Searched Terms"
+    sheet.cell(row=1, column=1).fill = header_fill_blue
+    sheet.cell(row=1, column=1).font = header_font_white
+    sheet.merge_cells(start_row=1, start_column=1, end_row=1, end_column=4)
+    
+    # Write the search terms below the header
+    formatted_search_terms = " || ".join([f"{term}" for term in search_terms])
+    sheet.cell(row=2, column=1).value = formatted_search_terms
+    sheet.cell(row=2, column=1).fill = highlight_fill_magenta
+    sheet.cell(row=2, column=1).font = header_font_white
+    sheet.merge_cells(start_row=2, start_column=1, end_row=2, end_column=4)
+    
+    # Add headers for the search results
+    sheet.append(["File/Folder", "Sheet", "Row", "Matched Terms", "Row Data"])
+    
+    # Apply header styles
+    header_row = sheet[4]
+    header_row[0].fill = folder_fill_purple
+    header_row[0].font = header_font_white
+    for cell in header_row[1:]:
+        cell.fill = header_fill_blue
+        cell.font = header_font_white
+    
+    sheet.freeze_panes = "A5"
+    
+    # Write the search results to the Excel sheet
+    for idx, result in results.iterrows():
+        row_num = sheet.max_row + 1
+        sheet.append([result["source_table"], result.get("source_sheet", ""), idx + 1, ""])
+        
+        # Write the matched terms
+        write_matched_terms(sheet, row_num, 4, result.to_dict())
+        
+        # Write row data headers and values
+        for col_num, (header, value) in enumerate(result.items(), start=5):
+            sheet.cell(row=row_num, column=col_num).value = value
+
+    workbook.save(output_file)
+
+# Function to write folder search results to Excel
+def write_folder_results_to_excel(folder_results, output_file):
+    workbook = load_workbook(output_file)
+    folder_sheet = workbook.create_sheet(title="Folder Results")
+    
+    # Write the folder names
+    folder_sheet.append(["Folder Name"])
+    for folder in folder_results:
+        folder_sheet.append([folder])
+
+    workbook.save(output_file)
+
+# Main function to perform the search and write to Excel
+def main_search_process(db_path, search_terms, folder_search_directory, output_file):
+    # Start the timer
+    start_time = time.time()
+    
+    # Connect to the database
+    conn = sqlite3.connect(db_path)
+    
+    # Perform the database search
+    search_results = search_database(search_terms, conn)
+    
+    # Close the database connection
+    conn.close()
+    
+    # Write search results to Excel
+    write_search_results_to_excel(search_results, output_file, search_terms)
+    
+    # Perform the folder search
+    folder_results = search_folders(folder_search_directory, search_terms[0], search_terms[1])
+    
+    # Write folder search results to Excel
+    write_folder_results_to_excel(folder_results, output_file)
+    
+    # End the timer and print runtime
+    total_runtime = time.time() - start_time
+    print(f"Search and folder results saved to {output_file}")
+    print(f"Total runtime: {total_runtime:.2f} seconds")
+
+# Example of running the search
+if __name__ == "__main__":
+    db_path = 'combined_data.db'
+    search_terms = ['bob', 'brown', '123456789', '01/01/1980', '456-7890']
+    folder_search_directory = r'C:\Users\Stephen\Documents\Folder_Search'
+    current_time = datetime.now().strftime("%Y-%m-%d %H-%M-%S")
+    output_file = f"{current_time}_Search_results.xlsx"
+    
+    main_search_process(db_path, search_terms, folder_search_directory, output_file)
+
