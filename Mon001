@@ -1,0 +1,510 @@
+import customtkinter as ctk
+import pandas as pd
+import time
+from joblib import Parallel, delayed
+from datetime import datetime
+import os
+import shutil
+import logging
+from multiprocessing import cpu_count
+from openpyxl import Workbook, load_workbook
+from openpyxl.styles import PatternFill, Border, Side, Font
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+import sys
+from CTkMessagebox import CTkMessagebox
+import subprocess
+import tkinter as tk
+#import ctypes  
+
+# Ensure that `new_search_terms` is defined globally
+new_search_terms = {}
+
+# Set up logging
+logging.basicConfig(filename='process_log.log', level=logging.INFO)
+
+# Start the timer for the total process
+start_time = time.time()
+
+# Define the file paths to search (Home values)
+file_paths = [
+    r"C:\Users\Stephen\Documents\1. A Work\Test area\Folder 1\large_test_file_1.xlsx",
+    r"C:\Users\Stephen\Documents\1. A Work\Test area\Folder 1\large_test_file_2.xlsx",
+    r"C:\Users\Stephen\Documents\1. A Work\Test area\Folder 1\large_test_file_3.xlsx",
+]
+
+# Define the local directory where the files will be copied to (Home value)
+local_directory = r"C:\Users\Stephen\Documents\1. A Work\python-full-3.12.5-windows-x86_64\python-full-3.12.5-windows-x86_64\Scripts\Copies"
+
+# Function to copy a single file
+def copy_file(file_path, local_directory):
+    file_name = os.path.basename(file_path)
+    local_file_path = os.path.join(local_directory, file_name)
+    shutil.copy2(file_path, local_file_path)
+    return local_file_path
+
+# Function to copy files in parallel using ThreadPoolExecutor
+def copy_files_to_local(shared_file_paths, local_directory):
+    # Dynamic thread allocation based on system resources
+    max_workers = cpu_count() - 1  # Dynamically adjust based on CPU count
+
+    if not os.path.exists(local_directory):
+        os.makedirs(local_directory)
+
+    local_file_paths = []
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = [executor.submit(copy_file, file_path, local_directory) for file_path in shared_file_paths]
+        for future in futures:
+            local_file_paths.append(future.result())
+
+    return local_file_paths
+
+# Copy files using parallel threads
+local_file_paths = copy_files_to_local(file_paths, local_directory)
+
+# Set DPI awareness for Windows to prevent scaling issues
+#ctypes.windll.shcore.SetProcessDpiAwareness(1)  # Ensures consistent scaling
+
+class SearchTermsUI(ctk.CTk):
+    def __init__(self):
+        super().__init__()
+
+        # Disable automatic DPI scaling
+        #ctk.deactivate_automatic_dpi_awareness()
+
+        # Set up appearance mode and color theme for the app
+        ctk.set_appearance_mode("dark")
+        ctk.set_default_color_theme("blue")
+
+        # Set window title and size
+        self.title("CCU Debtor Search")
+        self.geometry("600x400")
+        self.resizable(False, False)
+
+        # Configure layout
+        self.grid_columnconfigure(0, weight=1)  # For label column
+        self.grid_columnconfigure(1, weight=2)  # For input column to allow centering
+        self.grid_rowconfigure((0, 1, 2, 3, 4, 5), weight=1)
+
+        # Input variables
+        self.first_name_var = ctk.StringVar()
+        self.last_name_var = ctk.StringVar()
+        self.id_var = ctk.StringVar()
+        self.dob_var = ctk.StringVar()
+        self.ac_no_var = ctk.StringVar()
+        self.phone_var = ctk.StringVar()
+
+        # Initialize undo history and redo stacks for each input field
+        self.undo_history = {
+            "first_name": [],
+            "last_name": [],
+            "id": [],
+            "dob": [],
+            "ac_no": [],
+            "phone": []
+        }
+        self.redo_stack = {
+            "first_name": [],
+            "last_name": [],
+            "id": [],
+            "dob": [],
+            "ac_no": [],
+            "phone": []
+        }
+
+        # Create input fields with labels and modern CTkEntry
+        self.create_input("FIRST NAME", self.first_name_var, "first_name", 0)
+        self.create_input("LAST NAME", self.last_name_var, "last_name", 1)
+        self.create_input("ID", self.id_var, "id", 2)
+        self.create_input("DOB (DD/MM/YYYY)", self.dob_var, "dob", 3)
+        self.create_input("ACCOUNT NUMBER", self.ac_no_var, "ac_no", 4)
+        self.create_input("PHONE", self.phone_var, "phone", 5)
+        
+        # Create Submit button
+        self.submit_button = ctk.CTkButton(self, text="SUBMIT", command=self.submit_search_terms)
+        self.submit_button.grid(row=6, column=0, columnspan=2, pady=(35, 20), padx=150, ipadx=60, ipady=10, sticky="ew")
+
+        # Bind Enter key to submit the form
+        self.bind("<Return>", lambda event: self.submit_search_terms())
+
+        # Bind Ctrl+Z and Ctrl+Y for undo/redo functionality
+        self.bind_all("<Control-z>", lambda event: self.undo())
+        self.bind_all("<Control-y>", lambda event: self.redo())
+
+        # Center the window on the screen
+        self.center_window()
+
+        # Focus on the first input field automatically
+        self.after(100, lambda: self.focus_on_first_input())
+
+    def center_window(self):
+        """Centers the window on the screen."""
+        self.update_idletasks()  # Ensure accurate window size calculation
+        window_width = self.winfo_width()
+        window_height = self.winfo_height()
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+        position_top = int(screen_height / 2 - window_height / 2)
+        position_right = int(screen_width / 2 - window_width / 2)
+        self.geometry(f'{window_width}x{window_height}+{position_right}+{position_top}')
+
+    def focus_on_first_input(self):
+        """Sets focus on the first input field."""
+        self.grid_slaves(0, 1)[0].focus_set()
+
+    def create_input(self, label_text, variable, field_name, row):
+        """Creates labeled input fields using customtkinter."""
+        
+        # Create a label for the entry
+        label = ctk.CTkLabel(self, text=label_text)
+        label.grid(row=row, column=0, padx=30, pady=(20, 15), sticky="ew")  # Label stays left-aligned
+
+        # Create an entry widget linked to the variable
+        entry = ctk.CTkEntry(self, textvariable=variable, width=50)
+        entry.grid(row=row, column=1, padx=50, pady=(10, 10), sticky="ew")  # Input field centered horizontally
+
+        # Add real-time capitalization for first and last name
+        if field_name in ["first_name", "last_name"]:
+            variable.trace_add("write", self.capitalize_input)
+
+        # Track the initial state to ensure first letter is captured
+        self.track_changes(variable, field_name)
+
+        # Add current value to undo history on change
+        variable.trace_add("write", lambda *args, var=variable: self.track_changes(var, field_name))
+
+    # Function to capitalize input in real-time
+    def capitalize_input(self, *args):
+        """Automatically capitalize the input for first name and last name."""
+        if self.first_name_var.get():
+            self.first_name_var.set(self.first_name_var.get().upper())
+        if self.last_name_var.get():
+            self.last_name_var.set(self.last_name_var.get().upper())
+
+    def track_changes(self, variable, field_name):
+        """Tracks changes for undo/redo functionality."""
+        current_value = variable.get()
+
+        # Store in undo history if it's a new value
+        if len(self.undo_history[field_name]) == 0 or current_value != self.undo_history[field_name][-1]:
+            self.undo_history[field_name].append(current_value)
+
+        # Clear the redo stack after a new change (reset redo history)
+        self.redo_stack[field_name].clear()
+
+    def submit_search_terms(self):
+        """Handles submission of search terms."""
+        global new_search_terms
+
+        temp_search_terms = {
+            "first_name": self.first_name_var.get().strip(),
+            "last_name": self.last_name_var.get().strip(),
+            "id": self.id_var.get().strip(),
+            "dob": self.dob_var.get().strip(),
+            "ac_no": self.ac_no_var.get().strip(),
+            "phone": self.phone_var.get().strip()
+        }
+
+        # Only add non-empty entries to new_search_terms
+        new_search_terms = {key: value for key, value in temp_search_terms.items() if value}
+
+        # Close the main UI window after submission
+        self.destroy()
+
+    def undo(self):
+        """Handles undo functionality by reverting to the last state."""
+        focused_widget = self.focus_get()
+
+        # Identify the field being edited and access the corresponding undo history
+        for field_name, history in self.undo_history.items():
+            if focused_widget.cget("textvariable") == str(self.__dict__[f"{field_name}_var"]):
+                if len(history) > 1:  # Ensure there's something to undo
+                    last_value = history.pop()  # Remove the current change
+                    self.redo_stack[field_name].append(last_value)  # Push it to the redo stack
+                    self.__dict__[f"{field_name}_var"].set(history[-1])  # Revert to the previous value
+                break
+
+    def redo(self):
+        """Handles redo functionality by restoring the last undone state."""
+        focused_widget = self.focus_get()
+
+        # Identify the field being edited and access the corresponding redo stack
+        for field_name, redo_history in self.redo_stack.items():
+            if focused_widget.cget("textvariable") == str(self.__dict__[f"{field_name}_var"]):
+                if redo_history:  # Ensure there's something to redo
+                    next_value = redo_history.pop()  # Remove from redo stack
+                    self.undo_history[field_name].append(next_value)  # Push it to the undo history
+                    self.__dict__[f"{field_name}_var"].set(next_value)  # Restore the next value
+                break
+
+    def on_close(self):
+        sys.exit(0)
+
+# Run the UI to collect search terms
+if __name__ == "__main__":
+    app = SearchTermsUI()
+    app.protocol("WM_DELETE_WINDOW", app.on_close)  # Properly exit the program on window close
+    app.mainloop()
+
+
+
+
+
+# Use `new_search_terms` safely now after the UI closes
+first_name = new_search_terms.get("first_name", "Unknown")
+last_name = new_search_terms.get("last_name", "Unknown")
+last_name = new_search_terms.get("last_name", "Unknown")
+
+print(f"-----------Search Terms-----------")
+for key, value in new_search_terms.items():
+    print(f"{key.capitalize()}: {value}")
+    
+
+# Define the search terms by file and sheet (Home values)
+search_terms_per_file = {
+    local_file_paths[0]: {
+        "Sheet1": new_search_terms,
+        "Sheet2": new_search_terms,  
+        "Sheet3": new_search_terms,          
+    },
+    local_file_paths[1]: {
+        "Sheet1": new_search_terms,     
+    },
+    local_file_paths[2]: {
+        "Sheet1": new_search_terms,     
+    },
+}
+# Print the files to be processed
+print(f"---------------Files---------------")
+for path in local_file_paths:
+    print(os.path.basename(path))
+
+# Function to search for folders by first and last name in a directory
+def search_folders(directory, first_name, last_name):
+    results = []
+    for folder in Path(directory).iterdir():
+        if folder.is_dir() and first_name.lower() in folder.name.lower() and last_name.lower() in folder.name.lower():
+            results.append(folder)
+    return results
+
+# Function to format and write matched terms with || as a separator
+def write_matched_terms(sheet, row_num, col_num, matched_terms):
+    formatted_terms = []
+    for key, value in matched_terms.items():
+        formatted_key = key.replace('_', ' ').title()
+        formatted_value = str(value).capitalize()
+        formatted_terms.append(f"{formatted_key}: {formatted_value}")
+
+    # Join formatted terms with || separator
+    formatted_string = " || ".join(formatted_terms)
+    sheet.cell(row=row_num, column=col_num).value = formatted_string
+
+# Optimized function using .apply() to search for terms in a specific Excel file
+def process_excel_file(file_path, search_terms_per_file):
+    all_results = []
+    try:
+        if file_path.endswith('.xls'):
+            excel_data = pd.read_excel(file_path, sheet_name=None, engine='xlrd')
+        else:
+            excel_data = pd.read_excel(file_path, sheet_name=None, engine='openpyxl')
+        for sheet_name, sheet_data in excel_data.items():
+            cleaned_search_terms = {term_name: str(term_value).lower().strip() for term_name, term_value in search_terms_per_file[file_path].get(sheet_name, {}).items()}
+            headers = list(sheet_data.columns)
+
+            # Use apply() to vectorize row searching logic
+            def match_row(row):
+                found_terms = set()
+                matched_values = {}
+                for term_name, term_value_str in cleaned_search_terms.items():
+                    if any(term_value_str in str(cell).lower().strip() for cell in row):
+                        found_terms.add(term_name)
+                        matched_values[term_name] = term_value_str
+                if len(found_terms) >= 2:
+                    return {
+                        "Matched Terms": matched_values,
+                        "File": file_path,
+                        "File Name": os.path.basename(file_path),
+                        "Sheet": sheet_name,
+                        "Row Number": row.name + 1,  # Use row.name to get the index
+                        "Headers": headers,
+                        "Row Data": row.to_dict(),
+                        "Matched Row Data": matched_values
+                    }
+                return None
+
+            matched_rows = sheet_data.apply(match_row, axis=1).dropna().tolist()  # Apply the match logic across rows
+            all_results.extend(matched_rows)
+    except Exception as e:
+        logging.error(f"Error processing {file_path}: {e}")
+    return all_results
+
+# Parallel processing to handle files in batches
+def process_files_in_parallel(file_paths, search_terms_per_file):
+    all_results = Parallel(n_jobs=cpu_count() - 1)(delayed(process_excel_file)(file_path, search_terms_per_file) for file_path in file_paths)
+    return [item for sublist in all_results for item in sublist]
+
+# Execute the parallel processing
+all_results = process_files_in_parallel(local_file_paths, search_terms_per_file)
+
+# Prepare for writing to Excel
+workbook = Workbook()
+sheet = workbook.active
+sheet.title = "Results"
+
+# Insert two rows at the top for searched terms BEFORE any data is written
+sheet.insert_rows(1, 2)
+
+# Define styles (added back with new headers and colors)
+header_fill_blue = PatternFill(start_color="1e99c6", end_color="1e99c6", fill_type="solid")  # Blue fill for other headers
+folder_fill_purple = PatternFill(start_color="95348D", end_color="95348D", fill_type="solid")  # Purple for file/folder header
+highlight_fill_magenta = PatternFill(start_color="C93593", end_color="C93593", fill_type="solid")  # Magenta for search terms
+header_font_white = Font(bold=True, color="FFFFFF")  # White bold font for headers and folder matches
+
+# Write the header for searched terms (blue fill)
+sheet.cell(row=1, column=1).value = "Searched Terms"
+sheet.cell(row=1, column=1).fill = header_fill_blue
+sheet.cell(row=1, column=1).font = header_font_white
+sheet.merge_cells(start_row=1, start_column=1, end_row=1, end_column=4)
+
+# Write the search terms below the header (magenta fill)
+formatted_search_terms = " || ".join([f"{key.title()}: {value}" for key, value in new_search_terms.items()])
+sheet.cell(row=2, column=1).value = formatted_search_terms
+sheet.cell(row=2, column=1).fill = highlight_fill_magenta
+sheet.cell(row=2, column=1).font = header_font_white
+sheet.merge_cells(start_row=2, start_column=1, end_row=2, end_column=4)
+
+# Add headers for file, sheet, and row (purple for file/folder, blue for others)
+sheet.append(["File/Folder", "Sheet", "Row", "Matched Terms", "Row Data"])
+
+# Apply purple header fill for file/folder header
+header_row = sheet[4]  # Assuming the header is in row 3
+header_row[0].fill = folder_fill_purple  # Purple fill for "File/Folder"
+header_row[0].font = header_font_white  # White bold font for "File/Folder"
+
+# Apply blue header fill for other headers
+for cell in header_row[1:]:
+    cell.fill = header_fill_blue  # Blue fill for other headers
+    cell.font = header_font_white  # White bold font for other headers
+
+# Freeze the top rows so that everything above row 4 is frozen
+sheet.freeze_panes = "A5"
+
+# Write the file and folder search results to the Excel file, starting from row 4
+for idx, result in enumerate(all_results):
+    row_num = sheet.max_row + 1  # Fetch the correct row after headers and search terms are written
+    
+    # Append the basic information (File, Sheet, Row)
+    sheet.append([result["File Name"], result["Sheet"], result["Row Number"], ""])
+
+    # Add hyperlink to the file path for file name
+    file_cell = sheet.cell(row=row_num, column=1)
+    file_cell.hyperlink = result["File"]
+    file_cell.value = result["File Name"]
+
+    # Write the matched terms using the custom function
+    write_matched_terms(sheet, row_num, 4, result["Matched Terms"])
+
+    # Write the row data headers (blue) and values
+    headers = result["Headers"]
+    row_data = list(result["Row Data"].values())
+
+    # Write row data headers
+    for col_num, header in enumerate(headers, start=5):
+        cell = sheet.cell(row=row_num, column=col_num)
+        cell.value = header
+        cell.fill = header_fill_blue
+        cell.font = header_font_white
+        cell.border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
+
+    # Write row data values on the next row
+    row_num += 1
+    for col_num, data_value in enumerate(row_data, start=5):
+        cell = sheet.cell(row=row_num, column=col_num)
+        cell.value = data_value
+        cell.border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
+
+    # Add a bottom border after each data block
+    for col_num in range(1, 6):  # Assuming columns A to E
+        cell = sheet.cell(row=row_num, column=col_num)
+        cell.border = Border(bottom=Side(style='thin'))
+
+# Also write folder matches (if any)
+folder_search_directory = r"C:\Users\Stephen\Documents\1. A Work\python-full-3.12.5-windows-x86_64\python-full-3.12.5-windows-x86_64\Scripts\Folder Search"
+matched_folders = search_folders(folder_search_directory, first_name, last_name)
+
+if matched_folders:
+    for folder_path in matched_folders:
+        row_num = sheet.max_row + 1
+        folder_name = os.path.basename(folder_path)
+        sheet.append([folder_name, "", "", "", ""])
+
+        # Add hyperlink to the folder path and highlight the folder name cell
+        folder_cell = sheet.cell(row=row_num, column=1)
+        folder_cell.hyperlink = str(folder_path)  # Convert Path object to string
+        folder_cell.value = folder_name
+        folder_cell.fill = folder_fill_purple
+        folder_cell.font = header_font_white
+
+# Save the workbook (before doing the second pass)
+current_time = datetime.now().strftime("%Y-%m-%d %H-%M-%S")
+output_file = f"{current_time}_{first_name}_{last_name}_Search_results.xlsx"
+workbook.save(output_file)
+
+# Second pass to highlight matched terms after the file is created
+wb = load_workbook(output_file)
+sheet = wb.active
+
+# Define the fill for matched terms (orange fill as requested)
+highlight_fill = PatternFill(start_color="F78C2B", end_color="F78C2B", fill_type="solid")
+highlight_font = Font(bold=True, color="FFFFFF")  # Bold and white for matched text
+
+# Highlight the rows with matched terms (no new rows or data added)
+for row in sheet.iter_rows(min_row=4, min_col=5, max_col=sheet.max_column):
+    for cell in row:
+        if any(term_value.lower() in str(cell.value).lower() for term_value in new_search_terms.values()):
+            cell.fill = highlight_fill
+            cell.font = highlight_font  # Apply bold and white text to matched terms
+
+# End the timer and calculate the total runtime
+end_time = time.time()
+total_runtime = end_time - start_time
+
+# Insert total runtime at the bottom of the sheet
+last_row = sheet.max_row + 2  # Leave one empty row after the last data row
+sheet.cell(row=last_row, column=1).value = f"Total Runtime: {total_runtime:.2f} seconds"
+sheet.cell(row=last_row, column=1).font = Font(bold=True)  # Make the runtime text bold
+
+# Save the workbook with highlights and runtime
+wb.save(output_file)
+
+
+print(f"---------Total search complete. Results saved to {output_file}")
+print(f"---------Total Runtime: {total_runtime:.2f} seconds")
+
+# Function to ask user if they want to open the file with customized messagebox
+def ask_open_file(file_path):  
+    # Create a hidden CTk root window instead of Tk
+    root = ctk.CTk()  
+    root.withdraw()  # Hide the root window
+
+    # Call CTkMessagebox directly
+    msg = CTkMessagebox(
+        title="File Created",  
+        message = f"File Created Successfully\nFile Name: '{os.path.basename(file_path)}'\nWould you like to open the file now?",  
+        icon="question",  
+        option_1="No, Thanks",  
+        option_2="Yes, Open",          
+    )
+
+    # Handle user response
+    if msg.get() == "Yes, Open":  # Open the file if user says yes
+        if os.name == 'nt':  
+            os.startfile(file_path)
+        elif os.name == 'posix':  
+            subprocess.run(["open", file_path])
+
+    # Destroy the hidden root window
+    root.destroy()
+
+ask_open_file(output_file)
+
