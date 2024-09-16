@@ -1,0 +1,48 @@
+import sqlite3
+import pandas as pd
+import os
+import time
+
+# Connect to SQLite database
+def setup_database(db_path):
+    return sqlite3.connect(db_path)
+
+# Load Excel files and their sheets into the SQLite database
+def load_excel_to_sqlite(file_paths, conn):
+    for file_path in file_paths:
+        file_name = os.path.basename(file_path)
+        df = pd.read_excel(file_path, sheet_name=None)  # Read all sheets
+        for sheet_name, sheet_data in df.items():
+            table_name = f"{file_name}_{sheet_name}".replace(' ', '_')  # Create a unique table name
+            # Add columns to track the file and sheet source
+            sheet_data['source_file'] = file_name
+            sheet_data['source_sheet'] = sheet_name
+            # Load the sheet into the SQLite database
+            sheet_data.to_sql(table_name, conn, if_exists='replace', index=False)
+
+# Example of running this part
+file_paths = [
+    r"C:\Users\Stephen\Documents\1. A Work\Test area\Folder 1\large_test_file_1.xlsx",
+    r"C:\Users\Stephen\Documents\1. A Work\Test area\Folder 1\large_test_file_2.xlsx",
+    r"C:\Users\Stephen\Documents\1. A Work\Test area\Folder 1\large_test_file_3.xlsx",
+]
+
+# Start the timer
+start_time = time.time()
+
+# Create and set up the database
+db_path = 'combined_data.db'
+conn = setup_database(db_path)
+
+# Load Excel data into the SQLite database
+load_excel_to_sqlite(file_paths, conn)
+
+# Close the connection after the data is loaded
+conn.close()
+
+# End the timer
+end_time = time.time()
+total_runtime = end_time - start_time
+
+# Print the runtime
+print(f"Total Runtime: {total_runtime:.2f} seconds")
