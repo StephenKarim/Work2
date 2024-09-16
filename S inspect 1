@@ -1,0 +1,31 @@
+import sqlite3
+import pandas as pd
+
+# Function to connect to the database and fetch table names and their columns
+def inspect_database(db_path):
+    # Connect to SQLite database
+    conn = sqlite3.connect(db_path)
+    
+    # Get the list of all table names
+    tables = pd.read_sql("SELECT name FROM sqlite_master WHERE type='table';", conn)
+    
+    print("Tables in the database:")
+    print(tables)
+
+    # Loop through all tables and show the columns for each
+    for table_name in tables['name']:
+        print(f"\nTable: {table_name}")
+        # Fetch the column names using PRAGMA and wrap the table name in quotes
+        query = f'PRAGMA table_info("{table_name}");'
+        columns = pd.read_sql(query, conn)
+        print("Columns:")
+        print(columns[['name', 'type']])  # Display column name and type
+    
+    # Close the connection to the database
+    conn.close()
+
+# Path to your SQLite database
+db_path = 'combined_data.db'
+
+# Run the inspection
+inspect_database(db_path)
