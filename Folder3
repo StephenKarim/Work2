@@ -1,0 +1,45 @@
+from pathlib import Path
+
+# Function definition
+def search_folders(directory, first_name, last_name, max_depth=3):
+    """
+    Search for folders based on first and last name in a directory with recursive search limited to 3 levels deep.
+    Skips symbolic links to avoid infinite loops.
+    
+    Parameters:
+    - directory: Base directory to search within.
+    - first_name: First name to search for.
+    - last_name: Last name to search for.
+    - max_depth: Maximum depth for recursive search (default is 3).
+    
+    Returns:
+    - List of folders that match the first and last name.
+    """
+    results = []
+    base_path = Path(directory)
+
+    if base_path.is_dir():
+        # Perform recursive search with manual depth control
+        for subfolder in base_path.rglob('*'):
+            # Skip symbolic links to prevent circular traversal
+            if subfolder.is_symlink():
+                continue
+            
+            # Check if it's a folder and within the depth limit
+            relative_depth = len(subfolder.relative_to(base_path).parts)  # Get the depth relative to base_path
+            if subfolder.is_dir() and relative_depth <= max_depth:
+                if first_name.lower() in subfolder.name.lower() and last_name.lower() in subfolder.name.lower():
+                    results.append(subfolder)
+
+    return results
+
+# Example usage
+if __name__ == "__main__":
+    base_directory = "C:/path/to/base/directory"  # Update with your base directory
+    first_name = "John"  # Update with the first name you're searching for
+    last_name = "Doe"  # Update with the last name you're searching for
+
+    matching_folders = search_folders(base_directory, first_name, last_name)
+
+    for folder in matching_folders:
+        print(folder)
