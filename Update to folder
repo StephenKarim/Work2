@@ -1,0 +1,6 @@
+def search_folders(directory, first_name, last_name):
+    results = []
+    for folder in Path(directory).rglob('*'):
+        if folder.is_dir() and first_name.lower() in folder.name.lower() and last_name.lower() in folder.name.lower():
+            results.append(folder)
+    return results
