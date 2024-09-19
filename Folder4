@@ -1,0 +1,20 @@
+from pathlib import Path
+
+def search_folders(folders_to_search, first_name, last_name):
+    results = []
+    for directory in folders_to_search:
+        for folder in Path(directory).iterdir():
+            if folder.is_dir() and first_name.lower() in folder.name.lower() and last_name.lower() in folder.name.lower():
+                results.append(folder)
+    return results
+
+# Example usage
+folders_to_search = [
+    "C:/Users/Stephen/Documents/Folder1",
+    "C:/Users/Stephen/Documents/Folder2",
+    "C:/Users/Stephen/Documents/Folder3"
+]
+
+first_name = "John"
+last_name = "Doe"
+matching_folders = search_folders(folders_to_search, first_name, last_name)
