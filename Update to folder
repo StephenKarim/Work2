@@ -1,6 +1,52 @@
-def search_folders(directory, first_name, last_name):
+from pathlib import Path
+
+# Variables to be defined before the function
+base_directory = "C:/path/to/base/directory"  # Update with your base directory
+first_name = "John"  # Update with the first name you're searching for
+last_name = "Doe"  # Update with the last name you're searching for
+
+# Define the folders and whether they should use recursive search (True) or non-recursive (False)
+folder_choices = {
+    'Folder1': True,  # Use recursive search in 'Folder1'
+    'Folder2': False  # Use non-recursive search in 'Folder2'
+}
+
+# Function definition
+def search_folders(directory, first_name, last_name, folder_choices):
+    """
+    Search for folders based on first and last name in selected folders.
+    
+    Parameters:
+    - directory: Base directory to search within.
+    - first_name: First name to search for.
+    - last_name: Last name to search for.
+    - folder_choices: A dictionary where keys are folder names, and values are
+                      booleans indicating whether to use recursive search (True) or not (False).
+    
+    Returns:
+    - List of folders that match the first and last name.
+    """
     results = []
-    for folder in Path(directory).rglob('*'):
-        if folder.is_dir() and first_name.lower() in folder.name.lower() and last_name.lower() in folder.name.lower():
-            results.append(folder)
+    
+    for folder, use_recursive in folder_choices.items():
+        folder_path = Path(directory) / folder
+        
+        if folder_path.is_dir():
+            if use_recursive:
+                # Perform recursive search with rglob
+                for subfolder in folder_path.rglob('*'):
+                    if subfolder.is_dir() and first_name.lower() in subfolder.name.lower() and last_name.lower() in subfolder.name.lower():
+                        results.append(subfolder)
+            else:
+                # Perform non-recursive search with iterdir
+                for subfolder in folder_path.iterdir():
+                    if subfolder.is_dir() and first_name.lower() in subfolder.name.lower() and last_name.lower() in subfolder.name.lower():
+                        results.append(subfolder)
+    
     return results
+
+# Example usage in your existing code
+matching_folders = search_folders(base_directory, first_name, last_name, folder_choices)
+
+for folder in matching_folders:
+    print(folder)
