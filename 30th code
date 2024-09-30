@@ -1,0 +1,350 @@
+import customtkinter as ctk
+import pandas as pd
+import time
+from joblib import Parallel, delayed
+from datetime import datetime
+import os
+import shutil
+import logging
+from multiprocessing import cpu_count
+from openpyxl import Workbook, load_workbook
+from openpyxl.styles import PatternFill, Border, Side, Font
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+import sys
+from CTkMessagebox import CTkMessagebox
+import subprocess
+import tkinter as tk
+#import ctypes  
+
+# Ensure that new_search_terms is defined globally
+new_search_terms = {}
+
+# Set up logging
+logging.basicConfig(filename='process_log.log', level=logging.INFO)
+
+# Start the timer for the total process
+start_time = time.time()
+
+# Define the file paths to search (Home values)
+file_paths = [
+    r"C:\Users\Stephen\Documents\1. A Work\Test area\Folder 1\large_test_file_1.xlsx",
+    r"C:\Users\Stephen\Documents\1. A Work\Test area\Folder 1\large_test_file_2.xlsx",
+    r"C:\Users\Stephen\Documents\1. A Work\Test area\Folder 1\large_test_file_3.xlsx",
+]
+
+# Define the local directory where the files will be copied to (Home value)
+local_directory = r"C:\Users\Stephen\Documents\1. A Work\python-full-3.12.5-windows-x86_64\python-full-3.12.5-windows-x86_64\Scripts\Copies"
+
+# Function to copy a single file
+def copy_file(file_path, local_directory):
+    file_name = os.path.basename(file_path)
+    local_file_path = os.path.join(local_directory, file_name)
+    shutil.copy2(file_path, local_file_path)
+    return local_file_path
+
+# Function to copy files in parallel using ThreadPoolExecutor
+def copy_files_to_local(shared_file_paths, local_directory):
+    # Dynamic thread allocation based on system resources
+    max_workers = cpu_count() - 1  # Dynamically adjust based on CPU count
+
+    if not os.path.exists(local_directory):
+        os.makedirs(local_directory)
+
+    local_file_paths = []
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = [executor.submit(copy_file, file_path, local_directory) for file_path in shared_file_paths]
+        for future in futures:
+            local_file_paths.append(future.result())
+
+    return local_file_paths
+    
+# Copy files using parallel threads
+local_file_paths = copy_files_to_local(file_paths, local_directory)
+
+# Define the path to the text file that contains the replacement text
+replacement_text_file = r"C:\Users\Stephen\Documents\1. A Work\Test area\Filename holder.txt"
+
+# Read the text from the file using utf-16 encoding
+with open(replacement_text_file, "r", encoding="utf-16") as file:
+    replacement_text = file.read().strip()  # Read and strip any leading/trailing whitespace
+
+# Construct the search_terms_excel_path using the replacement_text variable
+search_terms_excel_path = fr"C:\Users\Stephen\Documents\1. A Work\Cautions\Requests\{replacement_text}_Request.xlsx"
+
+print(f"Updated search_terms_excel_path: {search_terms_excel_path}")
+
+
+customer_info_df = pd.read_excel(search_terms_excel_path, sheet_name="Caution Request Data", engine='openpyxl')
+
+# Extracting values from row 8, columns C to M (Excel's 1-based index corresponds to 7 and 2:13 in 0-based indexing)
+search_terms_row = customer_info_df.iloc[6, 2:13].astype(str)  # Extract row 8 (index 7) and columns C to M (indexes 2 to 12)
+
+# Replacing 'nan' with empty strings
+search_terms_row = search_terms_row.replace('nan', '')
+
+# Assigning the extracted data to new_search_terms with placeholders for unknown names, ensuring values are stripped
+new_search_terms = {
+    "first_name": search_terms_row.iloc[0].strip(),   # C8
+    "last_name": search_terms_row.iloc[1].strip(),    # D8
+    "dob": search_terms_row.iloc[2].strip(),           # E8
+    "id_1": search_terms_row.iloc[3].strip(),          # F8
+    "id_2": search_terms_row.iloc[4].strip(), # G8
+    "ac_no": search_terms_row.iloc[5].strip(),        # H8
+    "ac_no_2": search_terms_row.iloc[6].strip(), # I8
+    "phone": search_terms_row.iloc[7].strip(), # J8
+    "other_1": search_terms_row.iloc[8].strip(),        # K8
+    "other_2": search_terms_row.iloc[9].strip(), # L8
+    "other_3": search_terms_row.iloc[10].strip() # M8
+}
+
+# Filter out any empty values from new_search_terms
+new_search_terms = {key: value for key, value in new_search_terms.items() if value.strip()}
+
+# Use new_search_terms safely now after the UI closes
+first_name = new_search_terms.get("first_name", "Unknown")
+last_name = new_search_terms.get("last_name", "Unknown")
+
+print(f"-----------Search Terms-----------")
+for key, value in new_search_terms.items():
+    print(f"{key.capitalize()}: {value}")
+    
+
+# Define the search terms by file and sheet (Home values)
+search_terms_per_file = {
+    local_file_paths[0]: {
+        "Sheet1": new_search_terms,
+        "Sheet2": new_search_terms,  
+        "Sheet3": new_search_terms,          
+    },
+    local_file_paths[1]: {
+        "Sheet1": new_search_terms,     
+    },
+    local_file_paths[2]: {
+        "Sheet1": new_search_terms,     
+    },
+}
+# Print the files to be processed
+print(f"---------------Files---------------")
+for path in local_file_paths:
+    print(os.path.basename(path))
+    
+
+
+folders_to_search = [
+    r"C:\Users\Stephen\Documents\1. A Work\python-full-3.12.5-windows-x86_64\python-full-3.12.5-windows-x86_64\Scripts\Folder Search",
+]
+
+# Function definition
+def search_folders(folders_to_search, first_name, last_name):
+    results = []
+    for directory in folders_to_search:
+        if not Path(directory).exists():
+            logging.warning(f"Directory not found: {directory}")
+            continue
+        for folder in Path(directory).iterdir():
+            if folder.is_dir() and first_name.lower() in folder.name.lower() and last_name.lower() in folder.name.lower():
+                results.append(folder)
+    return results
+
+
+# Function to format and write matched terms with || as a separator
+def write_matched_terms(sheet, row_num, col_num, matched_terms):
+    formatted_terms = []
+    for key, value in matched_terms.items():
+        formatted_key = key.replace('_', ' ').title()
+        formatted_value = str(value).capitalize()
+        formatted_terms.append(f"{formatted_key}: {formatted_value}")
+
+    # Join formatted terms with || separator
+    formatted_string = " || ".join(formatted_terms)
+    sheet.cell(row=row_num, column=col_num).value = formatted_string
+
+# Optimized function using .apply() to search for terms in a specific Excel file
+def process_excel_file(file_path, search_terms_per_file):
+    all_results = []
+    try:
+        if file_path.endswith('.xls'):
+            excel_data = pd.read_excel(file_path, sheet_name=None, engine='xlrd')
+        else:
+            excel_data = pd.read_excel(file_path, sheet_name=None, engine='openpyxl')
+        for sheet_name, sheet_data in excel_data.items():
+            cleaned_search_terms = {term_name: str(term_value).lower().strip() for term_name, term_value in search_terms_per_file[file_path].get(sheet_name, {}).items()}
+            headers = list(sheet_data.columns)
+
+            # Use apply() to vectorize row searching logic
+            def match_row(row):
+                found_terms = set()
+                matched_values = {}
+                for term_name, term_value_str in cleaned_search_terms.items():
+                    if any(term_value_str in str(cell).lower().strip() for cell in row):
+                        found_terms.add(term_name)
+                        matched_values[term_name] = term_value_str
+                if len(found_terms) >= 2:
+                    return {
+                        "Matched Terms": matched_values,
+                        "File": file_path,
+                        "File Name": os.path.basename(file_path),
+                        "Sheet": sheet_name,
+                        "Row Number": row.name + 1,  # Use row.name to get the index
+                        "Headers": headers,
+                        "Row Data": row.to_dict(),
+                        "Matched Row Data": matched_values
+                    }
+                return None
+
+            matched_rows = sheet_data.apply(match_row, axis=1).dropna().tolist()  # Apply the match logic across rows
+            all_results.extend(matched_rows)
+    except Exception as e:
+        logging.error(f"Error processing {file_path}: {e}")
+    return all_results
+
+# Parallel processing to handle files in batches
+def process_files_in_parallel(file_paths, search_terms_per_file):
+    all_results = Parallel(n_jobs=cpu_count() - 1)(delayed(process_excel_file)(file_path, search_terms_per_file) for file_path in file_paths)
+    return [item for sublist in all_results for item in sublist]
+
+# Execute the parallel processing
+all_results = process_files_in_parallel(local_file_paths, search_terms_per_file)
+
+# Prepare for writing to Excel
+workbook = Workbook()
+sheet = workbook.active
+sheet.title = "Results"
+
+# Insert two rows at the top for searched terms BEFORE any data is written
+sheet.insert_rows(1, 2)
+
+# Define styles (added back with new headers and colors)
+header_fill_blue = PatternFill(start_color="1e99c6", end_color="1e99c6", fill_type="solid")  # Blue fill for other headers
+folder_fill_purple = PatternFill(start_color="95348D", end_color="95348D", fill_type="solid")  # Purple for file/folder header
+highlight_fill_magenta = PatternFill(start_color="C93593", end_color="C93593", fill_type="solid")  # Magenta for search terms
+header_font_white = Font(bold=True, color="FFFFFF")  # White bold font for headers and folder matches
+
+# Write the header for searched terms (blue fill)
+sheet.cell(row=1, column=1).value = "Searched Terms"
+sheet.cell(row=1, column=1).fill = header_fill_blue
+sheet.cell(row=1, column=1).font = header_font_white
+sheet.merge_cells(start_row=1, start_column=1, end_row=1, end_column=4)
+
+# Write the search terms below the header (magenta fill)
+formatted_search_terms = " || ".join([f"{key.title()}: {value}" for key, value in new_search_terms.items()])
+sheet.cell(row=2, column=1).value = formatted_search_terms
+sheet.cell(row=2, column=1).fill = highlight_fill_magenta
+sheet.cell(row=2, column=1).font = header_font_white
+sheet.merge_cells(start_row=2, start_column=1, end_row=2, end_column=4)
+
+# Add headers for file, sheet, and row (purple for file/folder, blue for others)
+sheet.append(["File/Folder", "Sheet", "Row", "Matched Terms", "Row Data"])
+
+# Apply purple header fill for file/folder header
+header_row = sheet[4]  # Assuming the header is in row 3
+header_row[0].fill = folder_fill_purple  # Purple fill for "File/Folder"
+header_row[0].font = header_font_white  # White bold font for "File/Folder"
+
+# Apply blue header fill for other headers
+for cell in header_row[1:]:
+    cell.fill = header_fill_blue  # Blue fill for other headers
+    cell.font = header_font_white  # White bold font for other headers
+
+# Freeze the top rows so that everything above row 4 is frozen
+sheet.freeze_panes = "A5"
+
+# Write the file and folder search results to the Excel file, starting from row 4
+for idx, result in enumerate(all_results):
+    row_num = sheet.max_row + 1  # Fetch the correct row after headers and search terms are written
+    
+    # Append the basic information (File, Sheet, Row)
+    sheet.append([result["File Name"], result["Sheet"], result["Row Number"], ""])
+
+    # Add hyperlink to the file path for file name
+    file_cell = sheet.cell(row=row_num, column=1)
+    file_cell.hyperlink = result["File"]
+    file_cell.value = result["File Name"]
+
+    # Write the matched terms using the custom function
+    write_matched_terms(sheet, row_num, 4, result["Matched Terms"])
+
+    # Write the row data headers (blue) and values
+    headers = result["Headers"]
+    row_data = list(result["Row Data"].values())
+
+    # Write row data headers
+    for col_num, header in enumerate(headers, start=5):
+        cell = sheet.cell(row=row_num, column=col_num)
+        cell.value = header
+        cell.fill = header_fill_blue
+        cell.font = header_font_white
+        cell.border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
+
+    # Write row data values on the next row
+    row_num += 1
+    for col_num, data_value in enumerate(row_data, start=5):
+        cell = sheet.cell(row=row_num, column=col_num)
+        cell.value = data_value
+        cell.border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
+
+    # Add a bottom border after each data block
+    for col_num in range(1, 6):  # Assuming columns A to E
+        cell = sheet.cell(row=row_num, column=col_num)
+        cell.border = Border(bottom=Side(style='thin'))
+
+# Also write folder matches (if any)
+matching_folders = search_folders(folders_to_search, first_name, last_name)
+
+if  matching_folders:
+    for folder_path in  matching_folders:
+        row_num = sheet.max_row + 1
+        folder_name = os.path.basename(folder_path)
+        sheet.append([folder_name, "", "", "", ""])
+
+        # Add hyperlink to the folder path and highlight the folder name cell
+        folder_cell = sheet.cell(row=row_num, column=1)
+        folder_cell.hyperlink = str(folder_path)  # Convert Path object to string
+        folder_cell.value = folder_name
+        folder_cell.fill = folder_fill_purple
+        folder_cell.font = header_font_white
+
+# Save the workbook (before doing the second pass)
+current_time = datetime.now().strftime("%Y-%m-%d %H-%M-%S")
+output_file = f"{current_time}_{first_name.upper()}_{last_name.upper()}_Search_results.xlsx"
+workbook.save(output_file)
+
+# Second pass to highlight matched terms after the file is created
+wb = load_workbook(output_file)
+sheet = wb.active
+
+# Define the fill for matched terms (orange fill as requested)
+highlight_fill = PatternFill(start_color="F78C2B", end_color="F78C2B", fill_type="solid")
+highlight_font = Font(bold=True, color="FFFFFF")  # Bold and white for matched text
+
+# Highlight the rows with matched terms (no new rows or data added)
+for row in sheet.iter_rows(min_row=4, min_col=5, max_col=sheet.max_column):
+    for cell in row:
+        if any(term_value.lower() in str(cell.value).lower() for term_value in new_search_terms.values()):
+            cell.fill = highlight_fill
+            cell.font = highlight_font  # Apply bold and white text to matched terms
+
+# End the timer and calculate the total runtime
+end_time = time.time()
+total_runtime = end_time - start_time
+
+# Insert total runtime at the bottom of the sheet
+last_row = sheet.max_row + 2  # Leave one empty row after the last data row
+sheet.cell(row=last_row, column=1).value = f"Total Runtime: {total_runtime:.2f} seconds"
+sheet.cell(row=last_row, column=1).font = Font(bold=True)  # Make the runtime text bold
+
+# Save the workbook with highlights and runtime
+wb.save(output_file)
+
+
+print(f"---------Total search complete. Results saved to {output_file}")
+print(f"---------Total Runtime: {total_runtime:.2f} seconds")
+
+
+# Path to the text file where the output file name will be appended
+generated_file_name_path = r"C:\Users\Stephen\Documents\1. A Work\python-full-3.12.5-windows-x86_64\python-full-3.12.5-windows-x86_64\Scripts\generated_file_name.txt"
+
+# Write the generated file name to the text file, overwriting any existing content
+with open(generated_file_name_path, "w", encoding="utf-8") as file:
+    file.write(output_file)  # Write the output file name without a newline
