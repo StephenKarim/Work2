@@ -1,0 +1,151 @@
+import pandas as pd
+import customtkinter as ctk
+from tkinter import filedialog, messagebox
+from docx import Document  # For Word output
+import os
+import time  # For runtime measurement
+
+# Set up customtkinter appearance
+ctk.set_appearance_mode("system")  # "light" or "dark"
+ctk.set_default_color_theme("blue")  # "blue", "green", "dark-blue"
+
+# Function to browse for the first file
+def browse_file1():
+    file_path = filedialog.askopenfilename(
+        title="Select the first Excel file",
+        filetypes=[("Excel Files", "*.xlsx")])
+    file1_entry.delete(0, "end")
+    file1_entry.insert(0, file_path)
+
+# Function to browse for the second file
+def browse_file2():
+    file_path = filedialog.askopenfilename(
+        title="Select the second Excel file",
+        filetypes=[("Excel Files", "*.xlsx")])
+    file2_entry.delete(0, "end")
+    file2_entry.insert(0, file_path)
+
+# Function to browse for the output folder
+def browse_output_folder():
+    folder_path = filedialog.askdirectory(
+        title="Select Output Folder")
+    output_folder_entry.delete(0, "end")
+    output_folder_entry.insert(0, folder_path)
+
+# Function to compare two sheets and return matching rows
+def compare_sheets(file1_name, sheet1_name, df1, file2_name, sheet2_name, df2):
+    try:
+        matching_rows = pd.merge(df1, df2, how='inner')
+        if not matching_rows.empty:
+            return {
+                'File 1': file1_name,
+                'Sheet 1': sheet1_name,
+                'File 2': file2_name,
+                'Sheet 2': sheet2_name,
+                'Matching Rows Count': len(matching_rows),
+                'Matching Rows Data': matching_rows
+            }
+        else:
+            return None
+    except Exception as e:
+        print(f"Error comparing sheets: {sheet1_name} and {sheet2_name}: {e}")
+        return None
+
+# Function to compare the two files and generate the output
+def compare_files(file1_path, file2_path, output_folder):
+    # Start measuring the runtime
+    start_time = time.time()
+
+    try:
+        # Load both Excel files, with all sheets as dictionaries of DataFrames
+        file1_sheets = pd.read_excel(file1_path, sheet_name=None)
+        file2_sheets = pd.read_excel(file2_path, sheet_name=None)
+
+        # Word document setup
+        doc = Document()
+        doc.add_heading('Matching Rows Comparison', 0)
+
+        # Track if any matches are found
+        any_matches = False
+
+        # Compare each sheet in both files
+        for sheet1_name, df1 in file1_sheets.items():
+            for sheet2_name, df2 in file2_sheets.items():
+                result = compare_sheets(os.path.basename(file1_path), sheet1_name, df1,
+                                        os.path.basename(file2_path), sheet2_name, df2)
+                if result:
+                    any_matches = True
+                    # Write results to the Word document
+                    doc.add_paragraph(f"File 1: {result['File 1']}")
+                    doc.add_paragraph(f"Sheet 1: {result['Sheet 1']}")
+                    doc.add_paragraph(f"File 2: {result['File 2']}")
+                    doc.add_paragraph(f"Sheet 2: {result['Sheet 2']}")
+                    doc.add_paragraph(f"Matching Rows Count: {result['Matching Rows Count']}")
+                    doc.add_paragraph('-' * 50)
+
+        # Save the Word document
+        output_file = os.path.join(output_folder, 'matching_rows_output.docx')
+        doc.save(output_file)
+
+        # End measuring the runtime
+        end_time = time.time()
+        runtime = end_time - start_time
+        print(f"Runtime: {runtime:.2f} seconds")
+
+        if any_matches:
+            print(f"Matching rows saved to {output_file}")
+        else:
+            print("No matching rows found between the two files.")
+    except Exception as e:
+        print(f"Error: {e}")
+
+# Function to collect inputs and close the UI
+def start_comparison():
+    file1_path = file1_entry.get()
+    file2_path = file2_entry.get()
+    output_folder = output_folder_entry.get()
+
+    if not file1_path or not file2_path or not output_folder:
+        messagebox.showerror("Input Error", "Please select both files and an output folder.")
+        return
+
+    # Destroy the GUI before starting the comparison
+    root.destroy()
+
+    # Call the comparison logic outside the UI
+    compare_files(file1_path, file2_path, output_folder)
+
+# Create the main customtkinter window
+root = ctk.CTk()
+root.title("Excel File Comparator")
+root.geometry("500x200")
+root.grid_columnconfigure(1, weight=1)
+
+# Create input fields and buttons for file browsing
+file1_label = ctk.CTkLabel(root, text="First Excel File:")
+file1_label.grid(row=0, column=0, padx=10, pady=10, sticky="w")
+file1_entry = ctk.CTkEntry(root, width=400)
+file1_entry.grid(row=0, column=1, padx=10, pady=10)
+file1_browse_button = ctk.CTkButton(root, text="Browse", command=browse_file1)
+file1_browse_button.grid(row=0, column=2, padx=10, pady=10)
+
+file2_label = ctk.CTkLabel(root, text="Second Excel File:")
+file2_label.grid(row=1, column=0, padx=10, pady=10, sticky="w")
+file2_entry = ctk.CTkEntry(root, width=400)
+file2_entry.grid(row=1, column=1, padx=10, pady=10)
+file2_browse_button = ctk.CTkButton(root, text="Browse", command=browse_file2)
+file2_browse_button.grid(row=1, column=2, padx=10, pady=10)
+
+output_folder_label = ctk.CTkLabel(root, text="Output Folder:")
+output_folder_label.grid(row=2, column=0, padx=10, pady=10, sticky="w")
+output_folder_entry = ctk.CTkEntry(root, width=400)
+output_folder_entry.grid(row=2, column=1, padx=10, pady=10)
+output_folder_browse_button = ctk.CTkButton(root, text="Browse", command=browse_output_folder)
+output_folder_browse_button.grid(row=2, column=2, padx=10, pady=10)
+
+# Add a button to start the comparison
+start_button = ctk.CTkButton(root, text="Start Comparison", command=start_comparison)
+start_button.grid(row=3, column=0, columnspan=3, padx=10, pady=20)
+
+# Start the customtkinter main loop
+root.mainloop()
