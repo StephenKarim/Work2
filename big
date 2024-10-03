@@ -1,0 +1,21 @@
+import pandas as pd
+import numpy as np
+
+# Generate a large DataFrame with random data
+def generate_large_excel(filename, rows, columns):
+    # Create random data
+    data = np.random.randint(0, 1000, size=(rows, columns))
+    df = pd.DataFrame(data, columns=[f'Column_{i}' for i in range(columns)])
+
+    # Save to Excel file
+    df.to_excel(filename, index=False)
+
+# Specify the folder where the files will be saved
+folder_path = r'C:\Users\Stephen\Documents\1. A Work\Test area\Folder 1'
+
+# Generate large Excel files
+generate_large_excel(f'{folder_path}\\large_test_file_1.xlsx', 100000, 50)
+generate_large_excel(f'{folder_path}\\large_test_file_2.xlsx', 200000, 50)
+generate_large_excel(f'{folder_path}\\large_test_file_3.xlsx', 300000, 50)
+
+print("Large Excel files have been generated and saved to the specified folder.")
