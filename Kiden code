@@ -1,0 +1,35 @@
+def get_inputs():
+    global credit_card_sheet, loan_sheet, month, year, agency_name, lc_variable, excel_file_path, output_file_path, customer_name_column, scotia_account_column, rbec_account_column, payment_date_column, payment_amount_column, comments_column
+
+    # Capture user inputs
+    credit_card_sheet = credit_card_sheet_entry.get()
+    loan_sheet = loan_sheet_entry.get()
+    month = int(month_entry.get())
+    year = int(year_entry.get())
+    agency_name = agency_entry.get()
+    lc_variable = lc_entry.get()
+    customer_name_column = customer_name_entry.get()
+    scotia_account_column = scotia_account_entry.get()
+    rbec_account_column = rbec_account_entry.get()
+    payment_date_column = payment_date_entry.get()
+    payment_amount_column = payment_amount_entry.get()
+    comments_column = comments_entry.get()
+
+    # Automatically generate the output file name based on the title
+    _, last_day_of_month = calendar.monthrange(year, month)
+    end_of_month = f"{month}/{last_day_of_month}/{year}"
+    title_text = f"PAYMENTS RECEIVED ON {lc_variable} CC AND LOAN ACCOUNTS HANDLED BY {agency_name} FOR PERIOD ENDING {end_of_month}"
+    output_file_name = title_text.replace("/", "-") + ".pdf"
+    output_file_path = os.path.join(output_dir, output_file_name)
+
+    # After collecting inputs, close the UI
+    root.destroy()
+
+# Ensure you run this after UI inputs are collected
+root.mainloop()
+
+# Now call functions that depend on the inputs here, after get_inputs() is executed
+title_text = f"PAYMENTS RECEIVED ON {lc_variable} CC AND LOAN ACCOUNTS HANDLED BY {agency_name} FOR PERIOD ENDING {end_of_month}"
+
+# Further logic like file reading, processing, and PDF generation can go here...
+generate_pdf(all_filtered_data, output_file_path)
