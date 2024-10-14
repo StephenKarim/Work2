@@ -1,5 +1,45 @@
+import pandas as pd
+from reportlab.pdfgen import canvas
+from reportlab.lib import colors
+from reportlab.lib.units import inch
+import calendar
+import customtkinter as ctk
+import tkinter as tk
+from tkinter import filedialog
+import sys
+import os
+from tkinter import messagebox
+from CTkMessagebox import CTkMessagebox
+import webbrowser
+from ctypes import windll
+
+
+# ======================
+# VARIABLES TO EDIT
+# ======================
+
+# Page settings and layout
+custom_page_width = 16 * inch  # Custom page width (e.g., 15 inches)
+custom_page_height = 9 * inch  # Custom page height (e.g., 10 inches)
+page_margin_left = 90  # Left margin for the page
+page_margin_right = 40  # Right margin for the page
+page_margin_top = 80  # Top margin for the page
+table_row_height = 25  # Height of each table row
+col_widths = [2.5 * inch, 2.0 * inch, 2.0 * inch, 2 * inch, 2 * inch, 3 * inch]  # Widths of each column
+font_size = 10  # Font size for table content
+header_font_size = 12  # Font size for headers
+text_color = colors.black  # Font color for the main text
+comment_highlight_color = colors.red  # Color for highlighting "REPAID" in comments
+
+# Title settings
+title_font_size = 12
+title_position_y = custom_page_height - page_margin_top + 30
+
+# ======================
+
+# Function to gather inputs and close the UI
 def get_inputs():
-    global credit_card_sheet, loan_sheet, month, year, agency_name, lc_variable, excel_file_path, output_file_path, customer_name_column, scotia_account_column, rbec_account_column, payment_date_column, payment_amount_column, comments_column
+    global credit_card_sheet, loan_sheet, month, year, agency_name, lc_variable, excel_file_path, output_file_path, customer_name_column, scotia_account_column, rbec_account_column, payment_date_column, payment_amount_column, comments_column, end_of_month, title_text
 
     # Capture user inputs
     credit_card_sheet = credit_card_sheet_entry.get()
@@ -25,11 +65,342 @@ def get_inputs():
     # After collecting inputs, close the UI
     root.destroy()
 
-# Ensure you run this after UI inputs are collected
+# Function to browse and select the Excel file
+def browse_excel_file():
+    global excel_file_path
+    excel_file_path = filedialog.askopenfilename(title="Select Excel File", filetypes=[("Excel Files", "*.xlsx *.xls")])
+    if excel_file_path:
+        excel_file_entry.delete(0, tk.END)
+        excel_file_entry.insert(0, excel_file_path)
+
+# Function to browse and select the output folder
+def browse_output_folder():
+    global output_dir
+    output_dir = filedialog.askdirectory(title="Select Output Folder")
+    if output_dir:
+        output_dir_entry.delete(0, tk.END)
+        output_dir_entry.insert(0, output_dir)
+
+# Function to handle the window close (X button)
+def on_closing():
+    root.quit()  # Ends the main loop and exits the program
+    root.destroy()  # Destroy the window completely
+    sys.exit()  # Quit the program entirely
+
+# Initialize the tkinter window
+root = tk.Tk()
+root.title("Generate Payment PDF")
+root.geometry("880x680")
+
+# Bind the "X" button (window close event) to the on_closing function
+root.protocol("WM_DELETE_WINDOW", on_closing)
+
+# Configure the customtkinter theme
+ctk.set_appearance_mode("light")
+ctk.set_default_color_theme("dark-blue")
+
+# Create a frame to hold all the elements
+frame = ctk.CTkFrame(root, fg_color="transparent")
+frame.grid(row=0, column=0, padx=20, pady=(30, 20))
+
+# Create and place widgets for sheet names inside the frame
+credit_card_label = ctk.CTkLabel(frame, text="Credit Card Sheet Name:")
+credit_card_label.grid(row=0, column=0, padx=10, pady=(20, 5))
+credit_card_sheet_entry = ctk.CTkEntry(frame, width=300)
+credit_card_sheet_entry.grid(row=0, column=1, padx=10, pady=(20, 5))
+credit_card_sheet_entry.insert(0, "LC BNK - BALANCED 9.30.2024")
+
+loan_label = ctk.CTkLabel(frame, text="Loan Sheet Name:")
+loan_label.grid(row=1, column=0, padx=10, pady=5)
+loan_sheet_entry = ctk.CTkEntry(frame, width=300)
+loan_sheet_entry.grid(row=1, column=1, padx=10, pady=5)
+loan_sheet_entry.insert(0, "DSX LC Loan Pyts @ 10.10.2024")
+
+# Browse Excel file
+excel_file_label = ctk.CTkLabel(frame, text="Excel File Path:")
+excel_file_label.grid(row=2, column=0, padx=10, pady=5)
+excel_file_entry = ctk.CTkEntry(frame, width=500)
+excel_file_entry.grid(row=2, column=1, padx=10, pady=5)
+excel_file_button = ctk.CTkButton(frame, text="Browse", command=browse_excel_file)
+excel_file_button.grid(row=2, column=2, padx=10, pady=5)
+
+# Month and Year
+month_label = ctk.CTkLabel(frame, text="Month (MM):")
+month_label.grid(row=3, column=0, padx=10, pady=5)
+month_entry = ctk.CTkEntry(frame, width=200)
+month_entry.grid(row=3, column=1, padx=10, pady=5)
+month_entry.insert(0, "9")
+
+year_label = ctk.CTkLabel(frame, text="Year (YYYY):")
+year_label.grid(row=4, column=0, padx=10, pady=5)
+year_entry = ctk.CTkEntry(frame, width=200)
+year_entry.grid(row=4, column=1, padx=10, pady=5)
+year_entry.insert(0, "2024")
+
+# Agency Name
+agency_label = ctk.CTkLabel(frame, text="Agency Name:")
+agency_label.grid(row=5, column=0, padx=10, pady=5)
+agency_entry = ctk.CTkEntry(frame, width=200)
+agency_entry.grid(row=5, column=1, padx=10, pady=5)
+agency_entry.insert(0, "HUNTER WARFIELD")
+
+# LC Variable
+lc_label = ctk.CTkLabel(frame, text="LC Variable:")
+lc_label.grid(row=6, column=0, padx=10, pady=5)
+lc_entry = ctk.CTkEntry(frame, width=200)
+lc_entry.grid(row=6, column=1, padx=10, pady=5)
+lc_entry.insert(0, "LC")
+
+# Browse Output folder
+output_dir_label = ctk.CTkLabel(frame, text="Output Folder Path:")
+output_dir_label.grid(row=7, column=0, padx=10, pady=5)
+output_dir_entry = ctk.CTkEntry(frame, width=500)
+output_dir_entry.grid(row=7, column=1, padx=10, pady=5)
+output_dir_button = ctk.CTkButton(frame, text="Browse", command=browse_output_folder)
+output_dir_button.grid(row=7, column=2, padx=10, pady=5)
+
+# Column names for Credit Card and Loan Data
+customer_name_label = ctk.CTkLabel(frame, text="Customer Name Column:")
+customer_name_label.grid(row=8, column=0, padx=10, pady=5)
+customer_name_entry = ctk.CTkEntry(frame, width=200)
+customer_name_entry.grid(row=8, column=1, padx=10, pady=5)
+customer_name_entry.insert(0, "CUSTOMER'S NAME")
+
+scotia_account_label = ctk.CTkLabel(frame, text="Scotia Account # Column:")
+scotia_account_label.grid(row=9, column=0, padx=10, pady=5)
+scotia_account_entry = ctk.CTkEntry(frame, width=200)
+scotia_account_entry.grid(row=9, column=1, padx=10, pady=5)
+scotia_account_entry.insert(0, "SCOTIA ACCOUNT #")
+
+rbec_account_label = ctk.CTkLabel(frame, text="RBEC Account # Column:")
+rbec_account_label.grid(row=10, column=0, padx=10, pady=5)
+rbec_account_entry = ctk.CTkEntry(frame, width=200)
+rbec_account_entry.grid(row=10, column=1, padx=10, pady=5)
+rbec_account_entry.insert(0, "RBEC ACCOUNT#")
+
+payment_date_label = ctk.CTkLabel(frame, text="Payment Date Column:")
+payment_date_label.grid(row=11, column=0, padx=10, pady=5)
+payment_date_entry = ctk.CTkEntry(frame, width=200)
+payment_date_entry.grid(row=11, column=1, padx=10, pady=5)
+payment_date_entry.insert(0, "PAYMENT DATE")
+
+payment_amount_label = ctk.CTkLabel(frame, text="Payment Amount Column:")
+payment_amount_label.grid(row=12, column=0, padx=10, pady=5)
+payment_amount_entry = ctk.CTkEntry(frame, width=200)
+payment_amount_entry.grid(row=12, column=1, padx=10, pady=5)
+payment_amount_entry.insert(0, "PAYMENT AMOUNT")
+
+comments_label = ctk.CTkLabel(frame, text="Comments Column:")
+comments_label.grid(row=13, column=0, padx=10, pady=5)
+comments_entry = ctk.CTkEntry(frame, width=200)
+comments_entry.grid(row=13, column=1, padx=10, pady=5)
+comments_entry.insert(0, "COMMENTS")
+
+# Submit Button
+submit_button = ctk.CTkButton(frame, text="Generate PDF", command=get_inputs)
+submit_button.grid(row=14, column=0, columnspan=3, pady=20)
+
+# Run the UI to get user input
 root.mainloop()
 
 # Now call functions that depend on the inputs here, after get_inputs() is executed
 title_text = f"PAYMENTS RECEIVED ON {lc_variable} CC AND LOAN ACCOUNTS HANDLED BY {agency_name} FOR PERIOD ENDING {end_of_month}"
 
-# Further logic like file reading, processing, and PDF generation can go here...
+# Load the Excel file (READ-ONLY)
+excel_file = pd.ExcelFile(excel_file_path)
+
+# Function to filter data by month, year, and agency, and remove duplicates based on multiple columns
+def filter_by_month_year_and_agency(df, month, year, agency_name):
+    df['PAYMENT DATE'] = pd.to_datetime(df['PAYMENT DATE'], dayfirst=True, errors='coerce')
+    df = df.dropna(subset=['PAYMENT DATE'])
+    df = df[df['AGENCY'].notna() & df['AGENCY'].str.strip().astype(bool)]
+    df_filtered = df[(df['PAYMENT DATE'].dt.month == month) & (df['PAYMENT DATE'].dt.year == year)]
+    df_filtered = df_filtered[df_filtered['AGENCY'].str.contains(agency_name, case=False)]
+    # Remove duplicates based on 'RBEC ACCOUNT #', 'PAYMENT DATE', and 'PAYMENT AMOUNT'
+    df_filtered = df_filtered.drop_duplicates(subset=['RBEC ACCOUNT#', 'PAYMENT DATE', 'PAYMENT AMOUNT'])
+    return df_filtered.sort_values(by="CUSTOMER'S NAME")
+
+# Function to check if the SCOTIA ACCOUNT # or RBEC ACCOUNT# exceeds 16 characters
+def check_split_needed(scotia_account, rbec_account):
+    return len(scotia_account) > 16 or len(rbec_account) > 16
+
+# Function to clean text by stripping unwanted characters
+def clean_text(text):
+    if pd.isna(text):  # Check for NaN values
+        return ""
+    return str(text).strip().replace("\n", " ").replace("\t", " ")  # Remove newline and tabs
+
+# Function to handle text that needs splitting into rows
+def add_row_with_split(c, row_data, x_offset, y_offset, row_height, col_widths):
+    for i, item in enumerate(row_data[:6]):
+        if i == 1:  # Handle SCOTIA ACCOUNT #
+            c.drawString(x_offset + 5, y_offset + 5, row_data[1][:16])
+        elif i == 2:  # Handle RBEC ACCOUNT #
+            c.drawString(x_offset + 5, y_offset + 5, row_data[2][:16])
+        else:
+            c.drawString(x_offset + 5, y_offset + 5, item)
+        c.rect(x_offset, y_offset, col_widths[i], row_height, stroke=1, fill=0)
+        x_offset += col_widths[i]
+
+    x_offset = page_margin_left
+    y_offset -= row_height
+
+    # Split the excess text
+    scotia_account_split = row_data[1][16:].strip() if len(row_data[1]) > 16 else ""
+    rbec_account_split = row_data[2][16:].strip() if len(row_data[2]) > 16 else ""
+
+    if scotia_account_split or rbec_account_split:
+        row_data_split = ['', scotia_account_split, rbec_account_split, '', '', '']
+        for i, item in enumerate(row_data_split):
+            c.drawString(x_offset + 5, y_offset + 5, item)
+            c.rect(x_offset, y_offset, col_widths[i], row_height, stroke=1, fill=0)
+            x_offset += col_widths[i]
+        y_offset -= row_height
+
+    return y_offset
+
+# Initialize an empty list to collect results from all sheets
+all_filtered_data = []
+
+# Iterate through each selected sheet (in memory)
+sheets_to_search = [credit_card_sheet, loan_sheet]
+for sheet in sheets_to_search:
+    if sheet in excel_file.sheet_names:
+        df = pd.read_excel(excel_file_path, sheet_name=sheet)
+        filtered_df = filter_by_month_year_and_agency(df, month, year, agency_name)
+        all_filtered_data.append(filtered_df)
+    else:
+        print(f"Sheet '{sheet}' not found in the Excel file.")
+
+# Function to generate PDF report with table borders and separate sections
+def generate_pdf(dataframe_list, pdf_filename):
+    if not dataframe_list:
+        print("No data to generate PDF.")
+        return
+
+    c = canvas.Canvas(pdf_filename, pagesize=(custom_page_width, custom_page_height))
+    width, height = custom_page_width, custom_page_height
+
+    # Set Title
+    c.setFont("Helvetica-Bold", title_font_size)
+    c.drawCentredString(width / 2, title_position_y, title_text)
+
+    # Define table labels
+    table_labels = ['CREDIT CARDS', 'LOANS']
+
+    # Set Table Headers
+    headers = ['CUSTOMER\'S NAME', 'SCOTIA ACCOUNT #', 'RBEC ACCOUNT#', 'PAYMENT DATE', 'PAYMENT AMOUNT', 'COMMENTS']
+
+    for idx, dataframe in enumerate(dataframe_list):
+        if not dataframe.empty:
+            # For the second table (LOANS), create a new page
+            if idx == 1:
+                c.showPage()  # Start a new page for LOANS
+                # Re-add the title to the new page for LOANS
+                c.setFont("Helvetica-Bold", title_font_size)
+                c.drawCentredString(width / 2, title_position_y, title_text)
+
+            # Write the label for the table (CREDIT CARDS or LOANS)
+            c.setFont("Helvetica-Bold", header_font_size)
+            c.drawString(page_margin_left, title_position_y - 40, table_labels[idx])
+
+            x_offset = page_margin_left
+            y_offset = height - page_margin_top - 60  # Adjust for table height
+
+            # Draw headers with border
+            for i, header in enumerate(headers):
+                c.drawString(x_offset + 5, y_offset + 5, header)
+                c.rect(x_offset, y_offset, col_widths[i], table_row_height, stroke=1, fill=0)
+                x_offset += col_widths[i]
+
+            # Set Data
+            c.setFont("Helvetica", font_size)
+            y_offset -= table_row_height
+
+            for _, row in dataframe.iterrows():
+                x_offset = page_margin_left
+                row_data = [
+                    clean_text(row["CUSTOMER'S NAME"]),
+                    clean_text(row['SCOTIA ACCOUNT #']),
+                    clean_text(row['RBEC ACCOUNT#']),
+                    clean_text(row['PAYMENT DATE'].strftime('%d/%m/%Y')),
+                    clean_text(f"${row['PAYMENT AMOUNT']:,.2f}"),
+                    clean_text(row.get('Comments', ''))
+                ]
+
+                # Check if SCOTIA ACCOUNT # or RBEC ACCOUNT# needs to be split into a new row
+                if check_split_needed(row_data[1], row_data[2]):
+                    y_offset = add_row_with_split(c, row_data, x_offset, y_offset, table_row_height, col_widths)
+                else:
+                    # Draw the row normally
+                    for i, item in enumerate(row_data):
+                        c.drawString(x_offset + 5, y_offset + 5, item)
+                        c.rect(x_offset, y_offset, col_widths[i], table_row_height, stroke=1, fill=0)
+                        x_offset += col_widths[i]
+                    y_offset -= table_row_height
+
+                if y_offset < page_margin_top:  # Start a new page if we reach the bottom
+                    c.showPage()
+                    y_offset = height - page_margin_top - table_row_height
+                    x_offset = page_margin_left
+
+                    # Redraw headers for the new page
+                    for i, header in enumerate(headers):
+                        c.drawString(x_offset + 5, y_offset + 5, header)
+                        c.rect(x_offset, y_offset, col_widths[i], table_row_height, stroke=1, fill=0)
+                        x_offset += col_widths[i]
+                    y_offset -= table_row_height
+
+    c.save()
+
+# Generate PDF from the filtered data (two separate tables for Credit Cards and Loans)
 generate_pdf(all_filtered_data, output_file_path)
+
+print(f"PDF report generated successfully at {output_file_path}!")
+
+# Function to ask user if they want to open the file with a customized CTkMessagebox
+def ask_open_file(file_path):
+    try:
+        # Disable DPI scaling for Windows to prevent DPI-related errors
+        if os.name == 'nt':
+            windll.shcore.SetProcessDpiAwareness(1)
+
+        # Create a hidden CTk root window
+        root = ctk.CTk()
+        root.withdraw()  # Hide the root window
+
+        # Create a message box asking if the user wants to open the file
+        msg = CTkMessagebox(
+            title="File Created",
+            message=f"File Created Successfully\n\nWould you like to open the file now?",
+            icon="question",
+            option_1="No, Thanks",
+            option_2="Yes, Open"
+        )
+
+        # If the user chooses to open the file
+        if msg.get() == "Yes, Open":
+            # Open the file depending on the operating system
+            if os.name == 'nt':  # For Windows
+                os.startfile(file_path)
+            elif os.name == 'posix':  # For macOS/Linux
+                subprocess.run(["open", file_path])
+
+    except TclError as e:
+        # This will catch any invalid command or Tcl-related errors (like the after event issues)
+        print(f"Ignored TclError: {e}")
+    except Exception as e:
+        # Catch any other exceptions that might occur
+        print(f"Ignored error: {e}")
+
+    finally:
+        try:
+            # Destroy the hidden root window after the message box is closed
+            root.destroy()
+        except TclError as e:
+            print(f"Ignored root destroy error: {e}")
+
+# Example usage
+ask_open_file(output_file_path) i, header in enumerate(headers):
+                        c = ctk.CTkLabel(frame, text="RBEC Account # Column:")
+rbec_account_label.grid(row
