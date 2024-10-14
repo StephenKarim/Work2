@@ -13,7 +13,6 @@ from CTkMessagebox import CTkMessagebox
 import webbrowser
 from ctypes import windll
 
-
 # ======================
 # VARIABLES TO EDIT
 # ======================
@@ -401,6 +400,4 @@ def ask_open_file(file_path):
             print(f"Ignored root destroy error: {e}")
 
 # Example usage
-ask_open_file(output_file_path) i, header in enumerate(headers):
-                        c = ctk.CTkLabel(frame, text="RBEC Account # Column:")
-rbec_account_label.grid(row
+ask_open_file(output_file_path)
