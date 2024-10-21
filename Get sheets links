@@ -1,0 +1,33 @@
+import openpyxl
+import os
+
+# Load the original workbook from the OneDrive-synced folder
+one_drive_path = "C:/Users/YourName/OneDrive/YourSyncedFolder/"
+original_workbook_name = "your_workbook.xlsx"  # Update with your actual file name
+original_workbook_path = os.path.join(one_drive_path, original_workbook_name)
+
+# Load the original workbook
+wb_original = openpyxl.load_workbook(original_workbook_path)
+
+# Create a new workbook for storing sheet names and hyperlinks
+wb_new = openpyxl.Workbook()
+
+# Select the active sheet in the new workbook (or create a new one)
+summary_sheet = wb_new.active
+summary_sheet.title = "Sheet Links"
+
+# Base path to the original workbook for hyperlink reference
+file_base_path = original_workbook_name
+
+# Loop through all sheets in the original workbook and create hyperlinks in the new workbook
+for i, sheet_name in enumerate(wb_original.sheetnames, start=1):
+    # Insert the sheet name and hyperlink to the corresponding sheet in the original workbook
+    cell = summary_sheet.cell(row=i, column=1)
+    cell.value = sheet_name
+    cell.hyperlink = f"[{file_base_path}]'{sheet_name}'!A1"
+    cell.style = "Hyperlink"  # Apply hyperlink style
+
+# Save the new workbook with the list of sheet names and links
+new_workbook_path = os.path.join(one_drive_path, "sheet_links_workbook.xlsx")
+wb_new.save(new_workbook_path)
+print(f"New workbook created with sheet links: {new_workbook_path}")
