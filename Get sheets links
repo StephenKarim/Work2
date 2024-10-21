@@ -27,7 +27,14 @@ for i, sheet_name in enumerate(wb_original.sheetnames, start=1):
     cell.hyperlink = f"[{file_base_path}]'{sheet_name}'!A1"
     cell.style = "Hyperlink"  # Apply hyperlink style
 
-# Save the new workbook with the list of sheet names and links
-new_workbook_path = os.path.join(one_drive_path, "sheet_links_workbook.xlsx")
-wb_new.save(new_workbook_path)
-print(f"New workbook created with sheet links: {new_workbook_path}")
+# Manually specify the folder path where the new workbook will be saved
+new_workbook_folder = "C:/YourFolder/Path/"  # <<-- Paste your folder path here
+
+# Ensure the folder exists
+if not os.path.exists(new_workbook_folder):
+    print(f"Folder '{new_workbook_folder}' does not exist.")
+else:
+    # Save the new workbook in the specified folder
+    new_workbook_path = os.path.join(new_workbook_folder, "sheet_links_workbook.xlsx")
+    wb_new.save(new_workbook_path)
+    print(f"New workbook created with sheet links: {new_workbook_path}")
