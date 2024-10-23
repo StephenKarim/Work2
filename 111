@@ -1,0 +1,126 @@
+import os
+import time
+import pandas as pd
+from openpyxl import load_workbook
+from datetime import timedelta, datetime
+
+# Function to extract the last entry from the first column, handling different errors
+def get_last_entry_column_1(file_path):
+    try:
+        # Attempt to open the file
+        df = pd.read_excel(file_path, engine='xlrd' if file_path.endswith('.xls') else 'openpyxl')
+
+        # Get the first column (index 0)
+        first_column = df.iloc[:, 0].dropna().tolist()
+
+        # If there are valid entries, get the last one
+        if first_column:
+            last_entry = first_column[-1]
+
+            # Try to convert it to a date if it's a number (Excel serial date) or datetime
+            if isinstance(last_entry, (int, float)):  # Excel serial date is a float or int
+                date_value = datetime(1899, 12, 30) + timedelta(days=int(last_entry))
+            elif isinstance(last_entry, str):
+                try:
+                    # Try to convert string to date with dayfirst=True to handle European date format
+                    date_value = pd.to_datetime(last_entry, dayfirst=True, errors='coerce')
+                    if pd.isnull(date_value):
+                        return last_entry  # Return original string if it can't be parsed as date
+                except:
+                    return last_entry  # If any issue, return original string
+            elif isinstance(last_entry, pd.Timestamp) or isinstance(last_entry, datetime):
+                date_value = last_entry
+            else:
+                return str(last_entry)  # Return as string if not a date or number
+
+            # Add 56 days to the date and return it as a Python datetime object
+            new_date = date_value + timedelta(days=56)
+            return new_date  # Return the new date as a Python datetime object
+        else:
+            return "None"
+    
+    except PermissionError:
+        # File is open or locked
+        print(f"File is open: {file_path}")
+        return "File is open"
+
+    except ValueError as e:
+        if 'encrypted' in str(e).lower():
+            # Handle encrypted files
+            print(f"File is encrypted: {file_path}")
+            return "File is encrypted"
+        else:
+            # Handle other value errors that are not related to encryption
+            print(f"Error reading {file_path}: {e}")
+            return "Error"
+    
+    except Exception as e:
+        # Generic error handling for any other errors
+        print(f"Error reading {file_path}: {e}")
+        return "Error"
+
+# Function to save the workbook with today's date
+def save_with_today_date(workbook, folder_path):
+    today_str = datetime.now().strftime('%Y-%m-%d')
+    filename = f"{today_str} Active Follow ups.xlsx"
+    full_path = os.path.join(folder_path, filename)
+    workbook.save(full_path)
+    print(f"Workbook saved as: {full_path}")
+
+# Start tracking time
+start_time = time.time()
+
+# Specify the folder to search and the template to write to
+search_folder = r"C:\Users\Stephen\Documents\1. Flows\Static examples"
+template_path = r"C:\Users\Stephen\Documents\1. Flows\ALL NOTES\Active Follow Up Template.xlsx"  # Path to the template
+save_folder = r"C:\Users\Stephen\Documents\1. Flows\ALL NOTES"  # Folder where the new file will be saved
+
+# Open the existing template workbook
+workbook = load_workbook(template_path)
+sheet = workbook.active
+
+# Start writing from the second row (to avoid overwriting the header)
+start_row = 2
+
+# Loop through the immediate directories in the specified folder
+for foldername in os.listdir(search_folder):
+    folder_path = os.path.join(search_folder, foldername)
+    
+    # Check if it's a directory
+    if os.path.isdir(folder_path):
+        file_notes_found = False  # Track if any file note is found in the folder
+        
+        # Loop through the files in the current folder (no subfolders)
+        for filename in os.listdir(folder_path):
+            if 'file notes' in filename.lower() and (filename.endswith('.xls') or filename.endswith('.xlsx')):
+                file_path = os.path.join(folder_path, filename)
+                
+                # Try to get the last entry from the first column
+                last_entry_value = get_last_entry_column_1(file_path)
+
+                # Add the folder name with a hyperlink to the folder and the last entry value
+                sheet.cell(row=start_row, column=1).value = foldername
+                sheet.cell(row=start_row, column=1).hyperlink = folder_path
+                sheet.cell(row=start_row, column=1).style = "Hyperlink"
+
+                # Insert the last entry (which is a datetime object or text) directly into Excel
+                sheet.cell(row=start_row, column=2).value = last_entry_value
+
+                start_row += 1  # Move to the next row after writing
+                file_notes_found = True  # Mark that a file note was found
+
+        # If no file notes were found, add a "None found" entry for the folder
+        if not file_notes_found:
+            sheet.cell(row=start_row, column=1).value = foldername
+            sheet.cell(row=start_row, column=1).hyperlink = folder_path
+            sheet.cell(row=start_row, column=1).style = "Hyperlink"
+            sheet.cell(row=start_row, column=2).value = "None found"
+            start_row += 1  # Move to the next row after writing
+
+# Save the workbook with today's date in the specified folder
+save_with_today_date(workbook, save_folder)
+
+# Calculate and display runtime
+end_time = time.time()
+total_runtime = end_time - start_time
+print(f"Script completed in {total_runtime:.2f} seconds.")
