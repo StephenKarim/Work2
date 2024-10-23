@@ -7,8 +7,8 @@ from datetime import timedelta, datetime
 # List of folder names to ignore
 ignored_folders = ['folder_to_ignore_1', 'folder_to_ignore_2']  # Add folder names you want to ignore here
 
-# Function to extract the last entry from the first column, handling different errors
-def get_last_entry_column_1(file_path):
+# Function to find the last valid date from the first column
+def get_last_valid_date(file_path):
     try:
         # Attempt to open the file
         df = pd.read_excel(file_path, engine='xlrd' if file_path.endswith('.xls') else 'openpyxl')
@@ -16,32 +16,31 @@ def get_last_entry_column_1(file_path):
         # Get the first column (index 0)
         first_column = df.iloc[:, 0].dropna().tolist()
 
-        # If there are valid entries, get the last one
-        if first_column:
-            last_entry = first_column[-1]
-
-            # Try to convert it to a date if it's a number (Excel serial date) or datetime
-            if isinstance(last_entry, (int, float)):  # Excel serial date is a float or int
-                date_value = datetime(1899, 12, 30) + timedelta(days=int(last_entry))
-            elif isinstance(last_entry, str):
+        # Iterate over the column to find the last valid date
+        last_valid_date = None
+        for entry in first_column:
+            # Try to convert the entry into a date if it's valid
+            if isinstance(entry, (int, float)):  # Excel serial date is a float or int
+                date_value = datetime(1899, 12, 30) + timedelta(days=int(entry))
+                last_valid_date = date_value
+            elif isinstance(entry, str):
                 try:
                     # Try to convert string to date with dayfirst=True to handle European date format
-                    date_value = pd.to_datetime(last_entry, dayfirst=True, errors='coerce')
-                    if pd.isnull(date_value):
-                        return last_entry  # Return original string if it can't be parsed as date
+                    date_value = pd.to_datetime(entry, dayfirst=True, errors='coerce')
+                    if pd.notnull(date_value):
+                        last_valid_date = date_value  # Update the last valid date
                 except:
-                    return last_entry  # If any issue, return original string
-            elif isinstance(last_entry, pd.Timestamp) or isinstance(last_entry, datetime):
-                date_value = last_entry
-            else:
-                return str(last_entry)  # Return as string if not a date or number
+                    pass  # Skip if it can't be converted
+            elif isinstance(entry, (pd.Timestamp, datetime)):
+                last_valid_date = entry  # Update the last valid date
 
-            # Add 56 days to the date and return it as a Python datetime object
-            new_date = date_value + timedelta(days=56)
-            return new_date  # Return the new date as a Python datetime object
+        # If we found a valid date, return it, adding 56 days
+        if last_valid_date:
+            new_date = last_valid_date + timedelta(days=56)
+            return new_date.strftime('%m/%d/%Y')  # Return the date formatted for Excel
         else:
-            return "None"
-    
+            return "None"  # If no valid date found
+
     except PermissionError:
         # File is open or locked
         print(f"File is open: {file_path}")
@@ -56,7 +55,7 @@ def get_last_entry_column_1(file_path):
             # Handle other value errors that are not related to encryption
             print(f"Error reading {file_path}: {e}")
             return "Error"
-    
+
     except Exception as e:
         # Generic error handling for any other errors
         print(f"Error reading {file_path}: {e}")
@@ -103,8 +102,8 @@ for foldername in os.listdir(search_folder):
             if 'file notes' in filename.lower() and (filename.endswith('.xls') or filename.endswith('.xlsx')):
                 file_path = os.path.join(folder_path, filename)
                 
-                # Try to get the last entry from the first column
-                last_entry_value = get_last_entry_column_1(file_path)
+                # Try to get the last valid date from the first column
+                last_entry_value = get_last_valid_date(file_path)
 
                 # Add the folder name with a hyperlink to the folder and the last entry value
                 sheet.cell(row=start_row, column=1).value = foldername
