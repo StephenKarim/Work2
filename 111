@@ -3,30 +3,34 @@ import time
 import pandas as pd
 from openpyxl import load_workbook
 from datetime import timedelta, datetime
+import xlrd  # To handle .xls files better
 
 # List of folder names to ignore
 ignored_folders = ['folder_to_ignore_1', 'folder_to_ignore_2']  # Add folder names you want to ignore here
 
-# Function to find the last valid date from the first column
+# Function to find the last valid date from the first column (read-only)
 def get_last_valid_date(file_path):
     try:
-        # Attempt to open the file
-        df = pd.read_excel(file_path, engine='xlrd' if file_path.endswith('.xls') else 'openpyxl')
+        # Only reading the file, no modifications!
+        if file_path.endswith('.xls'):
+            df = pd.read_excel(file_path, engine='xlrd')  # For .xls files
+        else:
+            df = pd.read_excel(file_path, engine='openpyxl')  # For .xlsx files
 
-        # Get the first column (index 0)
-        first_column = df.iloc[:, 0].dropna().tolist()
+        # Get the first column (index 0) and fill merged cells by forward filling the data (read-only)
+        first_column = df.iloc[:, 0].fillna(method='ffill').tolist()
 
-        # Iterate over the column to find the last valid date
+        # Iterate over the column to find the last valid date (no modifications to the original file)
         last_valid_date = None
         for entry in first_column:
-            # Try to convert the entry into a date if it's valid
+            # Try to convert the entry into a date if it's valid (read-only)
             if isinstance(entry, (int, float)):  # Excel serial date is a float or int
                 date_value = datetime(1899, 12, 30) + timedelta(days=int(entry))
                 last_valid_date = date_value
             elif isinstance(entry, str):
                 try:
-                    # Try to convert string to date with dayfirst=True to handle European date format
-                    date_value = pd.to_datetime(entry, dayfirst=True, errors='coerce')
+                    # Try to convert the string to a date without specifying dayfirst=True
+                    date_value = pd.to_datetime(entry, errors='coerce')
                     if pd.notnull(date_value):
                         last_valid_date = date_value  # Update the last valid date
                 except:
@@ -34,34 +38,43 @@ def get_last_valid_date(file_path):
             elif isinstance(entry, (pd.Timestamp, datetime)):
                 last_valid_date = entry  # Update the last valid date
 
-        # If we found a valid date, return it, adding 56 days
+        # If we found a valid date, return it, adding 56 days (return it as a datetime object)
         if last_valid_date:
             new_date = last_valid_date + timedelta(days=56)
-            return new_date.strftime('%m/%d/%Y')  # Return the date formatted for Excel
+            return new_date  # Return the datetime object directly for Excel to handle
         else:
             return "None"  # If no valid date found
 
     except PermissionError:
-        # File is open or locked
+        # File is open or locked (read-only)
         print(f"File is open: {file_path}")
         return "File is open"
 
     except ValueError as e:
         if 'encrypted' in str(e).lower():
-            # Handle encrypted files
+            # Handle encrypted files (read-only)
             print(f"File is encrypted: {file_path}")
             return "File is encrypted"
         else:
-            # Handle other value errors that are not related to encryption
+            # Handle other value errors that are not related to encryption (read-only)
+            print(f"Error reading {file_path}: {e}")
+            return "Error"
+
+    except xlrd.biffh.XLRDError as e:
+        # Specifically handle encrypted .xls files that can't be opened (read-only)
+        if 'Workbook is encrypted' in str(e):
+            print(f"File is encrypted: {file_path}")
+            return "File is encrypted"
+        else:
             print(f"Error reading {file_path}: {e}")
             return "Error"
 
     except Exception as e:
-        # Generic error handling for any other errors
+        # Generic error handling for any other errors (read-only)
         print(f"Error reading {file_path}: {e}")
         return "Error"
 
-# Function to save the workbook with today's date
+# Function to save the workbook with today's date (write only to the new file)
 def save_with_today_date(workbook, folder_path):
     today_str = datetime.now().strftime('%Y-%m-%d')
     filename = f"{today_str} Active Follow ups.xlsx"
@@ -69,54 +82,58 @@ def save_with_today_date(workbook, folder_path):
     workbook.save(full_path)
     print(f"Workbook saved as: {full_path}")
 
-# Start tracking time
+# Start tracking time (read/write operations only for new file)
 start_time = time.time()
 
-# Specify the folder to search and the template to write to
+# Specify the folder to search and the template to write to (read-only for template)
 search_folder = r"C:\Users\Stephen\Documents\1. Flows\Static examples"
-template_path = r"C:\Users\Stephen\Documents\1. Flows\ALL NOTES\Active Follow Up Template.xlsx"  # Path to the template
+template_path = r"C:\Users\Stephen\Documents\1. Flows\ALL NOTES\Active Follow Up Template.xlsx"  # Path to the template (read-only)
 save_folder = r"C:\Users\Stephen\Documents\1. Flows\ALL NOTES"  # Folder where the new file will be saved
 
-# Open the existing template workbook
+# Open the existing template workbook (read-only)
 workbook = load_workbook(template_path)
 sheet = workbook.active
 
-# Start writing from the second row (to avoid overwriting the header)
+# Start writing from the second row (writing only to the new workbook)
 start_row = 2
 
-# Loop through the immediate directories in the specified folder
+# Loop through the immediate directories in the specified folder (read-only)
 for foldername in os.listdir(search_folder):
     folder_path = os.path.join(search_folder, foldername)
     
-    # Check if the folder is in the ignored folders list
+    # Check if the folder is in the ignored folders list (read-only)
     if foldername in ignored_folders:
         print(f"Skipping folder: {foldername}")
         continue  # Skip this folder
     
-    # Check if it's a directory
+    # Check if it's a directory (read-only)
     if os.path.isdir(folder_path):
         file_notes_found = False  # Track if any file note is found in the folder
         
-        # Loop through the files in the current folder (no subfolders)
+        # Loop through the files in the current folder (no subfolders, read-only)
         for filename in os.listdir(folder_path):
             if 'file notes' in filename.lower() and (filename.endswith('.xls') or filename.endswith('.xlsx')):
                 file_path = os.path.join(folder_path, filename)
                 
-                # Try to get the last valid date from the first column
+                # Try to get the last valid date from the first column (read-only)
                 last_entry_value = get_last_valid_date(file_path)
 
-                # Add the folder name with a hyperlink to the folder and the last entry value
+                # Add the folder name with a hyperlink to the folder and the last entry value (write only to the new workbook)
                 sheet.cell(row=start_row, column=1).value = foldername
                 sheet.cell(row=start_row, column=1).hyperlink = folder_path
                 sheet.cell(row=start_row, column=1).style = "Hyperlink"
 
-                # Insert the last entry (which is a datetime object or text) directly into Excel
-                sheet.cell(row=start_row, column=2).value = last_entry_value
+                # Insert the last entry directly as a datetime object into Excel (write only to the new workbook)
+                if isinstance(last_entry_value, datetime):
+                    sheet.cell(row=start_row, column=2).value = last_entry_value
+                else:
+                    # Insert as text if it's not a valid datetime (write only to the new workbook)
+                    sheet.cell(row=start_row, column=2).value = last_entry_value
 
                 start_row += 1  # Move to the next row after writing
                 file_notes_found = True  # Mark that a file note was found
 
-        # If no file notes were found, add a "None found" entry for the folder
+        # If no file notes were found, add a "None found" entry for the folder (write only to the new workbook)
         if not file_notes_found:
             sheet.cell(row=start_row, column=1).value = foldername
             sheet.cell(row=start_row, column=1).hyperlink = folder_path
@@ -124,10 +141,10 @@ for foldername in os.listdir(search_folder):
             sheet.cell(row=start_row, column=2).value = "None found"
             start_row += 1  # Move to the next row after writing
 
-# Save the workbook with today's date in the specified folder
+# Save the workbook with today's date in the specified folder (write only to the new workbook)
 save_with_today_date(workbook, save_folder)
 
-# Calculate and display runtime
+# Calculate and display runtime (only runtime tracking, no modifications to original files)
 end_time = time.time()
 total_runtime = end_time - start_time
 print(f"Script completed in {total_runtime:.2f} seconds.")
