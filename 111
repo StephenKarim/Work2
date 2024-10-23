@@ -4,6 +4,9 @@ import pandas as pd
 from openpyxl import load_workbook
 from datetime import timedelta, datetime
 
+# List of folder names to ignore
+ignored_folders = ['folder_to_ignore_1', 'folder_to_ignore_2']  # Add folder names you want to ignore here
+
 # Function to extract the last entry from the first column, handling different errors
 def get_last_entry_column_1(file_path):
     try:
@@ -85,6 +88,11 @@ start_row = 2
 # Loop through the immediate directories in the specified folder
 for foldername in os.listdir(search_folder):
     folder_path = os.path.join(search_folder, foldername)
+    
+    # Check if the folder is in the ignored folders list
+    if foldername in ignored_folders:
+        print(f"Skipping folder: {foldername}")
+        continue  # Skip this folder
     
     # Check if it's a directory
     if os.path.isdir(folder_path):
