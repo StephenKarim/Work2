@@ -6,7 +6,15 @@ from datetime import timedelta, datetime
 import xlrd  # To handle .xls files better
 
 # List of folder names to ignore
-ignored_folders = ['folder_to_ignore_1', 'folder_to_ignore_2']  # Add folder names you want to ignore here
+ignored_folders = [
+    '1 CCU HANDBOOK-POLICY & OPERATING PROCEDURES', 
+    '1 CLASSIFIED DEBTS PROVISIONING PROCEDURE (June 2014)', 
+    '1 SAMPLE NAME', 
+    '2 DAILY REPORTING', 
+    '4 REPAID AND COMPROMISE', 
+    '5 WRITTEN OFF', 
+    '407'
+]  # Add folder names you want to ignore here
 
 # Function to find the last valid date from the first column (read-only)
 def get_last_valid_date(file_path):
@@ -18,23 +26,34 @@ def get_last_valid_date(file_path):
             df = pd.read_excel(file_path, engine='openpyxl')  # For .xlsx files
 
         # Get the first column (index 0) and fill merged cells by forward filling the data (read-only)
-        first_column = df.iloc[:, 0].fillna(method='ffill').tolist()
+        first_column = df.iloc[:, 0].ffill().tolist()  # Using .ffill() to forward fill merged cells
 
-        # Iterate over the column to find the last valid date (no modifications to the original file)
+        # Iterate over the column to find the last valid date
         last_valid_date = None
         for entry in first_column:
-            # Try to convert the entry into a date if it's valid (read-only)
+            # Handle Excel serial date format (float or int)
             if isinstance(entry, (int, float)):  # Excel serial date is a float or int
-                date_value = datetime(1899, 12, 30) + timedelta(days=int(entry))
-                last_valid_date = date_value
+                try:
+                    date_value = datetime(1899, 12, 30) + timedelta(days=int(entry))
+                    last_valid_date = date_value
+                except Exception as e:
+                    print(f"Error converting Excel serial date {entry}: {e}")
+                    continue
+
+            # Handle strings that might represent dates
             elif isinstance(entry, str):
                 try:
-                    # Try to convert the string to a date without specifying dayfirst=True
-                    date_value = pd.to_datetime(entry, errors='coerce')
+                    # Try different common date formats
+                    date_value = pd.to_datetime(entry, errors='coerce', format='%Y-%m-%d')  # Standard YYYY-MM-DD format
+                    if pd.isnull(date_value):  # Try another format
+                        date_value = pd.to_datetime(entry, errors='coerce', dayfirst=True)  # European format DD/MM/YYYY
                     if pd.notnull(date_value):
                         last_valid_date = date_value  # Update the last valid date
-                except:
-                    pass  # Skip if it can't be converted
+                except Exception as e:
+                    print(f"Error converting string date {entry}: {e}")
+                    continue
+
+            # Handle timestamps or datetime objects
             elif isinstance(entry, (pd.Timestamp, datetime)):
                 last_valid_date = entry  # Update the last valid date
 
@@ -86,9 +105,9 @@ def save_with_today_date(workbook, folder_path):
 start_time = time.time()
 
 # Specify the folder to search and the template to write to (read-only for template)
-search_folder = r"C:\Users\Stephen\Documents\1. Flows\Static examples"
-template_path = r"C:\Users\Stephen\Documents\1. Flows\ALL NOTES\Active Follow Up Template.xlsx"  # Path to the template (read-only)
-save_folder = r"C:\Users\Stephen\Documents\1. Flows\ALL NOTES"  # Folder where the new file will be saved
+search_folder = r"U:\CCU\SharedFolders\1 Debtor Correspondence\1 Debtor Correspondence"
+template_path = r"C:\Users\00015221\Documents\1. Flows\Calssified Debts\Active Follow ups\Active Follow Up Template.xlsx"  # Path to the template (read-only)
+save_folder = r"C:\Users\00015221\Documents\1. Flows\Calssified Debts\Active Follow ups"  # Folder where the new file will be saved
 
 # Open the existing template workbook (read-only)
 workbook = load_workbook(template_path)
