@@ -1,0 +1,49 @@
+import os
+import pandas as pd
+import shutil
+import time
+
+def copy_and_convert_xls(file_path, save_path):
+    """
+    Copies the .xls file to the specified save_path and converts the copy to .xlsx format.
+    """
+    # Load .xls file with pandas and save as .xlsx without modifying the original
+    df = pd.read_excel(file_path, engine='xlrd')
+    df.to_excel(save_path, index=False)
+
+# Main function to process file notes
+def process_file_notes(search_folder):
+    start_time = time.time()  # Start tracking runtime
+
+    # Loop through each folder in the search directory
+    for foldername in os.listdir(search_folder):
+        folder_path = os.path.join(search_folder, foldername)
+        
+        if os.path.isdir(folder_path):
+            for filename in os.listdir(folder_path):
+                # Only process .xls files with 'file note' in the filename
+                if 'file note' in filename.lower() and filename.endswith('.xls'):
+                    file_path = os.path.join(folder_path, filename)
+                    
+                    # Define the path for the copied and converted file
+                    save_path = os.path.join(folder_path, 'FILE NOTE COPY.xlsx')
+                    
+                    # Step 1: Copy the original file
+                    copy_path = os.path.join(folder_path, 'FILE NOTE COPY.xls')
+                    shutil.copyfile(file_path, copy_path)  # Copying the .xls file
+
+                    # Step 2: Convert the copied file to .xlsx format
+                    copy_and_convert_xls(copy_path, save_path)
+                    
+                    print(f"Copied and converted: {filename} -> {save_path}")
+
+    # Calculate and display runtime
+    end_time = time.time()
+    total_runtime = end_time - start_time
+    print(f"Process completed in {total_runtime:.2f} seconds.")
+
+# Specify the main directory to search for file notes
+search_folder = r"U:\CCU\SharedFolders\1 Debtor Correspondence\1 Debtor Correspondence"
+
+# Run the function
+process_file_notes(search_folder)
