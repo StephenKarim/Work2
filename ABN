@@ -1,0 +1,65 @@
+import os
+from openpyxl import Workbook, load_workbook
+from openpyxl.utils.exceptions import InvalidFileException
+
+search_folder = r"U:\CCU\SharedFolders\1 Debtor Correspondence\1 Debtor Correspondence"
+output_path = r"C:\Users\00015221\Documents\Encrypted_Files_List.xlsx"
+
+# Prepare output workbook
+output_workbook = Workbook()
+output_sheet = output_workbook.active
+output_sheet.title = "Encrypted Files"
+output_sheet.append(["Folder Name", "Hyperlink"])
+
+def is_file_encrypted(file_path):
+    """Check if a file is encrypted by trying to load it."""
+    try:
+        load_workbook(file_path, data_only=True)
+        return False  # If it loads successfully, it's not encrypted
+    except InvalidFileException:
+        return True  # Encrypted file
+    except Exception:
+        return False  # Any other error means it's likely not encrypted
+
+def create_empty_file_note_copy(folder_path):
+    """Create an empty FILE NOTE COPY.xlsx file in the specified folder."""
+    file_path = os.path.join(folder_path, "FILE NOTE COPY.xlsx")
+    if not os.path.exists(file_path):
+        empty_workbook = Workbook()
+        empty_workbook.save(file_path)
+        print(f"Created empty FILE NOTE COPY.xlsx in {folder_path}")
+
+for foldername in os.listdir(search_folder):
+    folder_path = os.path.join(search_folder, foldername)
+    if not os.path.isdir(folder_path):
+        continue
+
+    # Search for files with "file note" in the name, including one level of subfolders
+    encrypted_found = False  # Track if an encrypted file is found in this folder
+    for dirpath, _, filenames in os.walk(folder_path):
+        # Limit depth to one subfolder deep
+        if dirpath.count(os.sep) - folder_path.count(os.sep) > 1:
+            continue
+        
+        for filename in filenames:
+            if "file note" in filename.lower():
+                file_path = os.path.join(dirpath, filename)
+                
+                if is_file_encrypted(file_path):
+                    # Add folder and hyperlink to output workbook
+                    output_sheet.append([foldername, dirpath])
+                    output_sheet.cell(row=output_sheet.max_row, column=2).hyperlink = dirpath
+                    output_sheet.cell(row=output_sheet.max_row, column=2).style = "Hyperlink"
+                    
+                    # Create an empty FILE NOTE COPY.xlsx in the folder
+                    create_empty_file_note_copy(dirpath)
+                    
+                    encrypted_found = True
+
+        # If encrypted file found in main folder, no need to check further subfolders
+        if encrypted_found:
+            break
+
+# Save the output file listing all encrypted files
+output_workbook.save(output_path)
+print(f"Encrypted files list saved to: {output_path}")
