@@ -1,0 +1,38 @@
+from openpyxl.utils.exceptions import InvalidFileException
+
+def get_last_valid_date(file_path):
+    try:
+        workbook = load_workbook(file_path, data_only=True)
+        sheet = workbook.active
+
+        first_column = [cell.value for cell in sheet['A'] if cell.value is not None]
+        last_valid_date = None
+        for entry in first_column:
+            if isinstance(entry, (int, float)):
+                try:
+                    date_value = datetime(1899, 12, 30) + timedelta(days=int(entry))
+                    last_valid_date = date_value
+                except Exception:
+                    continue
+            elif isinstance(entry, str):
+                try:
+                    date_value = pd.to_datetime(entry, errors='coerce', format='%Y-%m-%d')
+                    if pd.isnull(date_value):
+                        date_value = pd.to_datetime(entry, errors='coerce', dayfirst=False, format='%m/%d/%Y')
+                    if pd.notnull(date_value):
+                        last_valid_date = date_value
+                except Exception:
+                    continue
+            elif isinstance(entry, datetime):
+                last_valid_date = entry
+
+        if last_valid_date:
+            return last_valid_date + timedelta(days=56)
+        else:
+            return "None"  # Return "None" if no valid date found
+    except PermissionError:
+        return "File is open"
+    except InvalidFileException:  # Catch encrypted files
+        return "ENCRYPTED"
+    except Exception as e:
+        return f"Error: {e}"
