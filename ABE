@@ -1,0 +1,9 @@
+import re
+
+def format_account_number(account_text):
+    # Remove all letters (uppercase and lowercase) from the account number
+    account_str = re.sub(r'[A-Za-z]', '', str(account_text))
+    # Remove any existing spaces and format with spaces every 4 characters
+    account_str = account_str.replace(" ", "")
+    formatted = " ".join(account_str[i:i+4] for i in range(0, len(account_str), 4))
+    return formatted
