@@ -1,0 +1,84 @@
+import os
+import pandas as pd
+import shutil
+import time
+from xlrd.biffh import XLRDError  # Import error for encrypted .xls files
+
+# List of folders to ignore
+ignored_folders = [
+    '1 CCU HANDBOOK-POLICY & OPERATING PROCEDURES',
+    '1 CLASSIFIED DEBTS PROVISIONING PROCEDURE (June 2014)',
+    '1 SAMPLE NAME',
+    '2 DAILY REPORTING',
+    '4 REPAID AND COMPROMISE',
+    '5 WRITTEN OFF',
+    '407'
+]
+
+def copy_and_convert_xls(file_path, save_path):
+    """
+    Copies the .xls file to the specified save_path and converts the copy to .xlsx format.
+    """
+    try:
+        # Load .xls file with pandas and save as .xlsx without modifying the original
+        df = pd.read_excel(file_path, engine='xlrd')
+        df.to_excel(save_path, index=False)
+        print(f"Converted and saved as: {save_path}")
+    except XLRDError:
+        # Handle encrypted .xls files
+        print(f"File is encrypted and cannot be processed: {file_path}")
+    except Exception as e:
+        print(f"An error occurred while converting {file_path}: {e}")
+
+# Main function to process file notes
+def process_file_notes(search_folder):
+    start_time = time.time()  # Start tracking runtime
+
+    # Loop through each folder in the search directory
+    for foldername in os.listdir(search_folder):
+        folder_path = os.path.join(search_folder, foldername)
+        
+        # Skip folders in the ignored list
+        if foldername in ignored_folders:
+            print(f"Skipping folder: {foldername}")
+            continue
+        
+        if os.path.isdir(folder_path):
+            file_notes_found = False  # Track if any "file note" file is found in the folder
+            
+            for filename in os.listdir(folder_path):
+                # Only process .xls files with 'file note' in the filename
+                if 'file note' in filename.lower() and filename.endswith('.xls'):
+                    file_path = os.path.join(folder_path, filename)
+                    
+                    # Define the path for the copied and converted file
+                    save_path = os.path.join(folder_path, 'FILE NOTE COPY.xlsx')
+                    
+                    # Step 1: Copy the original file
+                    copy_path = os.path.join(folder_path, 'FILE NOTE COPY.xls')
+                    try:
+                        shutil.copyfile(file_path, copy_path)  # Copying the .xls file
+                        print(f"Copied: {filename} -> {copy_path}")
+                    except Exception as e:
+                        print(f"Failed to copy {file_path}: {e}")
+                        continue
+
+                    # Step 2: Convert the copied file to .xlsx format
+                    copy_and_convert_xls(copy_path, save_path)
+                    
+                    file_notes_found = True  # Mark that a file note was found and processed
+
+            # If no "file note" file was found in this folder, print a message
+            if not file_notes_found:
+                print(f"No 'file note' found in folder: {foldername}")
+
+    # Calculate and display runtime
+    end_time = time.time()
+    total_runtime = end_time - start_time
+    print(f"Process completed in {total_runtime:.2f} seconds.")
+
+# Specify the main directory to search for file notes
+search_folder = r"U:\CCU\SharedFolders\1 Debtor Correspondence\1 Debtor Correspondence"
+
+# Run the function
+process_file_notes(search_folder)
