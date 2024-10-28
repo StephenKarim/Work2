@@ -1,0 +1,109 @@
+import os
+import pandas as pd
+import shutil
+import time
+from xlrd.biffh import XLRDError  # Import error for encrypted .xls files
+
+# List of folders to ignore
+ignored_folders = [
+    '1 CCU HANDBOOK-POLICY & OPERATING PROCEDURES',
+    '1 CLASSIFIED DEBTS PROVISIONING PROCEDURE (June 2014)',
+    '1 SAMPLE NAME',
+    '2 DAILY REPORTING',
+    '4 REPAID AND COMPROMISE',
+    '5 WRITTEN OFF',
+    '407'
+]
+
+def copy_and_convert_xls(file_path, save_path):
+    """
+    Copies the .xls file to the specified save_path and converts the copy to .xlsx format.
+    """
+    try:
+        # Load .xls file with pandas and save as .xlsx without modifying the original
+        df = pd.read_excel(file_path, engine='xlrd')
+        df.to_excel(save_path, index=False)
+    except XLRDError:
+        # Handle encrypted .xls files
+        pass
+    except Exception as e:
+        pass  # Suppressed error messages as requested
+
+def process_folder(folder_path):
+    """
+    Process a folder for 'file note' .xls files, including files in subfolders.
+    """
+    file_note_count = 0
+    # Iterate over files and subfolders in the current folder
+    for filename in os.listdir(folder_path):
+        file_path = os.path.join(folder_path, filename)
+        
+        if os.path.isdir(file_path):
+            # Skip any further nested subfolders (only one level deep)
+            continue
+        
+        # Only process .xls files with 'file note' in the filename
+        if 'file note' in filename.lower() and filename.endswith('.xls'):
+            # Define the path for the converted file
+            save_path = os.path.join(folder_path, 'FILE NOTE COPY.xlsx')
+            
+            # Step 1: Copy the original file
+            copy_path = os.path.join(folder_path, 'FILE NOTE COPY.xls')
+            try:
+                # Copying the .xls file, replacing if it exists
+                shutil.copyfile(file_path, copy_path)  
+            except Exception as e:
+                continue  # Skip if copy fails
+
+            # Step 2: Convert the copied file to .xlsx format
+            copy_and_convert_xls(copy_path, save_path)
+            
+            # Step 3: Delete the temporary .xls copy after conversion
+            try:
+                os.remove(copy_path)
+            except Exception as e:
+                pass  # Suppressed error messages as requested
+            
+            file_note_count += 1
+
+    return file_note_count
+
+# Main function to process file notes
+def process_file_notes(search_folder):
+    start_time = time.time()  # Start tracking runtime
+    folder_count = 0
+    total_file_note_count = 0
+
+    # Loop through each folder in the search directory
+    for foldername in os.listdir(search_folder):
+        folder_path = os.path.join(search_folder, foldername)
+        
+        # Skip folders in the ignored list
+        if foldername in ignored_folders:
+            continue
+        
+        if os.path.isdir(folder_path):
+            folder_count += 1
+            # Process files in the main folder
+            file_note_count = process_folder(folder_path)
+            total_file_note_count += file_note_count
+            
+            # Search one level deep: process files in each subfolder
+            for subfoldername in os.listdir(folder_path):
+                subfolder_path = os.path.join(folder_path, subfoldername)
+                if os.path.isdir(subfolder_path):
+                    file_note_count = process_folder(subfolder_path)
+                    total_file_note_count += file_note_count
+
+    # Calculate and display runtime
+    end_time = time.time()
+    total_runtime = end_time - start_time
+    print(f"Process completed in {total_runtime:.2f} seconds.")
+    print(f"Total folders processed: {folder_count}")
+    print(f"Total 'file note' files converted: {total_file_note_count}")
+
+# Specify the main directory to search for file notes
+search_folder = r"U:\CCU\SharedFolders\1 Debtor Correspondence\1 Debtor Correspondence"
+
+# Run the function
+process_file_notes(search_folder)
