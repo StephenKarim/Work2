@@ -1,0 +1,92 @@
+import os
+import pandas as pd
+from docx import Document
+import time
+
+# List of folders to ignore
+ignored_folders = [
+    '1 CCU HANDBOOK-POLICY & OPERATING PROCEDURES',
+    '1 CLASSIFIED DEBTS PROVISIONING PROCEDURE (June 2014)',
+    '1 SAMPLE NAME',
+    '2 DAILY REPORTING',
+    '4 REPAID AND COMPROMISE',
+    '5 WRITTEN OFF',
+    '407'
+]
+
+# Define paths
+search_folder = r"U:\CCU\SharedFolders\1 Debtor Correspondence\1 Debtor Correspondence"  # Replace with your directory path
+output_file_path = r"U:\CCU\Results\fire_lines_output.xlsx"  # Replace with desired output path
+
+# Initialize a list to store lines containing "fire"
+fire_lines = []
+
+def search_fire_in_doc(doc_path):
+    """
+    Search for the word 'fire' in a Word document and capture each line that contains it.
+    """
+    doc = Document(doc_path)
+    for paragraph in doc.paragraphs:
+        if "fire" in paragraph.text.lower():  # Case-insensitive search
+            fire_lines.append(paragraph.text.strip())
+
+def process_folder(folder_path):
+    """
+    Process a folder to find Word documents with 'static' in the filename.
+    """
+    for filename in os.listdir(folder_path):
+        file_path = os.path.join(folder_path, filename)
+        
+        # Skip subfolders, as we're only processing files in the main folder
+        if os.path.isdir(file_path):
+            continue
+        
+        # Only process .docx files with 'static' in the filename
+        if 'static' in filename.lower() and filename.endswith('.docx'):
+            try:
+                search_fire_in_doc(file_path)
+            except Exception as e:
+                print(f"Could not process file {file_path}: {e}")
+
+def process_files(search_folder):
+    """
+    Main function to search all eligible Word documents for the word 'fire'.
+    """
+    start_time = time.time()
+    folder_count = 0
+
+    # Loop through each folder in the search directory
+    for foldername in os.listdir(search_folder):
+        folder_path = os.path.join(search_folder, foldername)
+        
+        # Skip folders in the ignored list
+        if foldername in ignored_folders:
+            continue
+        
+        if os.path.isdir(folder_path):
+            folder_count += 1
+            # Process files in the main folder
+            process_folder(folder_path)
+            
+            # Search one level deep: process files in each subfolder
+            for subfoldername in os.listdir(folder_path):
+                subfolder_path = os.path.join(folder_path, subfoldername)
+                if os.path.isdir(subfolder_path):
+                    process_folder(subfolder_path)
+
+    # Save results to Excel if any "fire" lines are found
+    if fire_lines:
+        df = pd.DataFrame(fire_lines, columns=["Fire Lines"])
+        df.to_excel(output_file_path, index=False)
+        print(f"Search results saved to {output_file_path}")
+    else:
+        print("No lines containing 'fire' were found in any document.")
+
+    # Calculate and display runtime
+    end_time = time.time()
+    total_runtime = end_time - start_time
+    print(f"Process completed in {total_runtime:.2f} seconds.")
+    print(f"Total folders processed: {folder_count}")
+
+# Run the main function
+process_files(search_folder)
