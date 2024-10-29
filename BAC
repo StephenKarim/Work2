@@ -1,0 +1,43 @@
+from docx import Document
+import pandas as pd
+
+# Load the document
+file_path = "path_to_your_file.docx"  # Replace with the actual path
+doc = Document(file_path)
+
+# Initialize a dictionary to hold the extracted information
+data = {}
+
+# Define the current label and multi-line data tracker
+current_label = None
+current_value = ""
+
+# Loop through paragraphs to extract data
+for para in doc.paragraphs:
+    text = para.text.strip()
+    
+    if text:  # Skip empty lines
+        # If text is an uppercase label, assume it's a new field
+        if text.isupper():
+            # Save the current field's data if we're switching to a new label
+            if current_label:
+                data[current_label] = current_value.strip()
+            # Reset for the new label
+            current_label = text
+            current_value = ""
+        else:
+            # If it's part of a value, continue collecting the value
+            current_value += " " + text
+
+# Add the last field after exiting the loop
+if current_label:
+    data[current_label] = current_value.strip()
+
+# Convert dictionary to DataFrame for better formatting
+df = pd.DataFrame(list(data.items()), columns=["Field", "Value"])
+
+# Save to Excel for easy viewing
+output_path = "extracted_data.xlsx"  # Specify where to save
+df.to_excel(output_path, index=False)
+
+print("Data extraction complete. Saved to:", output_path)
