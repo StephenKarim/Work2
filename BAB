@@ -1,0 +1,106 @@
+import os
+import re
+import pandas as pd
+from docx import Document
+import time
+
+# Start tracking runtime
+start_time = time.time()
+
+# List of folders to ignore
+ignored_folders = [
+    '1 CCU HANDBOOK-POLICY & OPERATING PROCEDURES',
+    '1 CLASSIFIED DEBTS PROVISIONING PROCEDURE (June 2014)',
+    '1 SAMPLE NAME',
+    '2 DAILY REPORTING',
+    '4 REPAID AND COMPROMISE',
+    '5 WRITTEN OFF',
+    '407'
+]
+
+# Define paths
+search_folder = r"U:\CCU\SharedFolders\1 Debtor Correspondence\1 Debtor Correspondence"  # Replace with your directory path
+output_file_path = r"U:\CCU\Results\fire_lines_output.xlsx"  # Replace with desired output path
+
+# Initialize a list to store sentences containing "fire"
+fire_contexts = []
+
+def search_fire_in_doc(doc_path):
+    """
+    Load the entire document into memory, then search for 'fire' and extract the context between two full stops.
+    Read-only operation that does not modify the original file.
+    """
+    doc = Document(doc_path)
+    
+    # Concatenate all paragraphs into a single block of text
+    full_text = "\n".join(paragraph.text for paragraph in doc.paragraphs)
+    
+    # Regular expression to capture context around "fire" (case-insensitive)
+    pattern = r"([^\.]*\bfire\b[^\.]*)"
+    
+    # Find all occurrences of "fire" with context, ignoring case
+    matches = re.findall(pattern, full_text, re.IGNORECASE)
+    
+    # Store each match in fire_contexts
+    for match in matches:
+        fire_contexts.append(match.strip())
+
+def process_folder(folder_path):
+    """
+    Process a folder to find Word documents with 'static' in the filename.
+    """
+    for filename in os.listdir(folder_path):
+        file_path = os.path.join(folder_path, filename)
+        
+        # Skip subfolders, as we're only processing files in the main folder
+        if os.path.isdir(file_path):
+            continue
+        
+        # Only process .docx files with 'static' in the filename
+        if 'static' in filename.lower() and filename.endswith('.docx'):
+            try:
+                search_fire_in_doc(file_path)
+            except Exception as e:
+                print(f"Could not process file {file_path}: {e}")
+
+def process_files(search_folder):
+    """
+    Main function to search all eligible Word documents for the word 'fire'.
+    """
+    folder_count = 0
+
+    # Loop through each folder in the search directory
+    for foldername in os.listdir(search_folder):
+        folder_path = os.path.join(search_folder, foldername)
+        
+        # Skip folders in the ignored list
+        if foldername in ignored_folders:
+            continue
+        
+        if os.path.isdir(folder_path):
+            folder_count += 1
+            # Process files in the main folder
+            process_folder(folder_path)
+            
+            # Search one level deep: process files in each subfolder
+            for subfoldername in os.listdir(folder_path):
+                subfolder_path = os.path.join(folder_path, subfoldername)
+                if os.path.isdir(subfolder_path):
+                    process_folder(subfolder_path)
+
+    # Save results to Excel if any "fire" lines are found
+    if fire_contexts:
+        df = pd.DataFrame(fire_contexts, columns=["Context Around Fire"])
+        df.to_excel(output_file_path, index=False)
+        print(f"Search results saved to {output_file_path}")
+    else:
+        print("No instances of 'fire' were found in any document.")
+
+    # Calculate and display runtime
+    end_time = time.time()
+    total_runtime = end_time - start_time
+    print(f"Process completed in {total_runtime:.2f} seconds.")
+    print(f"Total folders processed: {folder_count}")
+
+# Run the main function
+process_files(search_folder)
