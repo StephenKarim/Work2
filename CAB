@@ -63,6 +63,9 @@ def process_file(file_path):
                 # Format specified columns as currency and replace NaN with None
                 extracted_data = format_currency_column(extracted_data, ["I.D.C.D", "Regulated", "Regulated CC"])
                 
+                # Replace any remaining NaNs with None
+                extracted_data = extracted_data.where(pd.notnull(extracted_data), None)
+                
                 # Append the data to the accumulated DataFrame for this search term
                 accumulated_data[file_name] = pd.concat([accumulated_data[file_name], extracted_data])
     except Exception as e:
@@ -79,10 +82,7 @@ for file_path in file_paths:
 for file_name, data in accumulated_data.items():
     if not data.empty:
         # Convert all text to uppercase and strip leading and trailing whitespace
-        data_cleaned = data.apply(lambda x: x.str.upper().str.strip())
-        
-        # Drop duplicates considering all columns
-        data_cleaned = data_cleaned.drop_duplicates(subset=["Last Name", "First Name"])
+        data_cleaned = data.apply(lambda x: x.str.upper().str.strip() if x.dtype == "object" else x)
         
         # Replace NaN with None in the entire DataFrame
         data_cleaned = data_cleaned.where(pd.notnull(data_cleaned), None)
@@ -92,7 +92,7 @@ for file_name, data in accumulated_data.items():
         output_file_path = os.path.join(output_dir, output_file_name)
         
         # Write the cleaned data (with None instead of NaN) to a new Excel file
-        data_cleaned.to_excel(output_file_path, index=False)
+        data_cleaned.to_excel(output_file_path, index=False, engine='openpyxl')
         print(f"File created for {file_name}: {output_file_path}")
 
 print(f"Total processing time: {time.time() - start_time:.2f} seconds")
