@@ -1,0 +1,95 @@
+import pandas as pd
+import os
+from datetime import datetime
+import time
+import re
+
+# Define search terms and corresponding file names
+search_terms = {
+    "KH": "KHADIR", "IVS": "INDY", "CJ": "CHANADE", "TP": "THYUS", 
+    "AK": "ANITA", "JM": "JANELLE", "JD": "JENESIA", "TV": "T'SHAI", 
+    "ALH": "ADRIEL", "NS": "NALINI", "AM": "AMIRAH", "RR": "RIA", 
+    "LRR": "LISA", "NDM": "NYRON", "MR": "MITRA" 
+}
+search_column_index = 4  # Column E in 0-based index
+file_paths = [
+    r"C:\Users\00015221\OneDrive - Republic Bank Limited\Fixed\1.CCU DBASE 2008 TO 2019 [working] Fixed.xlsx", 
+    r"C:\Users\00015221\OneDrive - Republic Bank Limited\Fixed\2.CCU DBASE WEF JANUARY 2020 fixed.xlsx",
+    r"C:\Users\00015221\OneDrive - Republic Bank Limited\Fixed\3.CCU DBASE WEF APRIL 2024 fixed.xlsx"
+]
+output_dir = r"C:\Users\00015221\Documents\1. Flows\Roll\1. Search"
+if not os.path.exists(output_dir):
+    os.makedirs(output_dir)
+
+# Initialize accumulated data for each search term
+accumulated_data = {file_name: pd.DataFrame() for file_name in search_terms.values()}
+
+def clean_account_number(account):
+    """Remove non-numeric characters from account and CC numbers."""
+    return re.sub(r'\D', '', str(account))
+
+def format_currency_column(df, columns):
+    """Format specified columns as currency."""
+    for col in columns:
+        df.loc[:, col] = pd.to_numeric(df[col], errors='coerce')  # Convert to numeric, keeping NaNs for empty cells
+        df.loc[:, col] = df[col].apply(lambda x: '${:,.2f}'.format(x) if pd.notna(x) else None)
+    return df
+
+def process_file(file_path):
+    try:
+        # Load Excel file and first sheet
+        sheet_data = pd.ExcelFile(file_path).parse(sheet_name=0)
+        for term, file_name in search_terms.items():
+            term_lower = term.strip().lower()
+            matching_rows = sheet_data[
+                sheet_data.iloc[:, search_column_index]
+                .astype(str)
+                .str.strip()
+                .str.lower()
+                .str.contains(term_lower, na=False)
+            ]
+            if not matching_rows.empty:
+                # Include columns D, E, F, I, J, and specified currency columns
+                extracted_data = matching_rows.iloc[:, [2, 3, 4, 8, 9, 13, 14, 15]].copy()  # Copy to avoid SettingWithCopyWarning
+                extracted_data.columns = ["Last Name", "First Name", "Analyst", "Account#", "CC#", "Regulated", "Regulated CC", "I.D.C.D"]
+                
+                # Clean Account# and CC# by removing non-numeric characters
+                extracted_data.loc[:, "Account#"] = extracted_data["Account#"].apply(clean_account_number)
+                extracted_data.loc[:, "CC#"] = extracted_data["CC#"].apply(clean_account_number)
+                
+                # Format specified columns as currency
+                extracted_data = format_currency_column(extracted_data, ["I.D.C.D", "Regulated", "Regulated CC"])
+                
+                # Append the data to the accumulated DataFrame for this search term
+                accumulated_data[file_name] = pd.concat([accumulated_data[file_name], extracted_data])
+    except Exception as e:
+        print(f"Error processing {file_path}: {e}")
+
+# Main loop with runtime tracking
+start_time = time.time()
+for file_path in file_paths:
+    print(f"Processing file: {file_path}")
+    process_start_time = time.time()
+    process_file(file_path)
+    print(f"Completed in {time.time() - process_start_time:.2f} seconds")
+
+for file_name, data in accumulated_data.items():
+    if not data.empty:
+        # Convert all text to uppercase and strip leading and trailing whitespace
+        data_cleaned = data.apply(lambda x: x.str.upper().str.strip() if x.dtype == "object" else x)
+        
+        # Drop duplicates based on "Last Name" and "First Name" columns
+        data_cleaned = data_cleaned.drop_duplicates(subset=["Last Name", "First Name"])
+        
+        # Replace NaN with None in the entire DataFrame
+        data_cleaned = data_cleaned.where(pd.notnull(data_cleaned), None)
+        
+        today_date = datetime.now().strftime("%Y-%m-%d")
+        output_file_name = f"{file_name}_{today_date}.xlsx"
+        output_file_path = os.path.join(output_dir, output_file_name)
+        
+        # Write the cleaned data (with None instead of NaN) to a new Excel file
+        data_cleaned.to_excel(output_file_path, index=False, engine='openpyxl')
+        print(f"File created for {file_name}: {output_file_path}")
+
+print(f"Total processing time: {time.time() - start_time:.2f} seconds")
