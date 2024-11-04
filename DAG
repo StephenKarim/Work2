@@ -1,0 +1,62 @@
+import win32com.client as win32
+from openpyxl import Workbook
+import re
+
+# File paths
+doc_file_path = r'path_to_your_word_doc.doc'  # Path to the .doc file
+excel_file_path = r'output.xlsx'              # Path to the output Excel file
+
+# Table, row, and column specifications
+table_index = 1  # Table index in the .doc file (1-based index)
+row_index = 1    # Row in the table (1-based index)
+col_index = 1    # Column in the table (1-based index)
+
+def extract_text_from_doc(file_path, table_idx, row_idx, col_idx):
+    # Open Word application
+    word_app = win32.gencache.EnsureDispatch('Word.Application')
+    word_app.Visible = False  # Set to True if you want to see Word open the file (for debugging)
+    
+    # Open the .doc file
+    doc = word_app.Documents.Open(file_path)
+    
+    # Extract the text from the specified cell
+    try:
+        table = doc.Tables(table_idx)
+        cell_text = table.Cell(row_idx, col_idx).Range.Text.strip()
+        print("Extracted Text:", cell_text)
+    except Exception as e:
+        print("Error extracting text:", e)
+        cell_text = None
+    finally:
+        # Close the document and Word application
+        doc.Close(False)
+        word_app.Quit()
+    
+    return cell_text
+
+def clean_text_for_excel(text):
+    # Remove characters not allowed in Excel, such as control characters
+    # Excel allows printable characters, so we use a regex to remove anything that isn't printable.
+    cleaned_text = re.sub(r'[^\x20-\x7E]+', '', text)  # Keep ASCII printable characters only
+    return cleaned_text
+
+def write_text_to_excel(text, excel_path):
+    # Create a new Excel workbook and select the active sheet
+    wb = Workbook()
+    ws = wb.active
+    
+    # Write the text into a specific cell in Excel
+    ws['A1'] = text  # Adjust 'A1' if you want the text in a different cell
+    
+    # Save the Excel file
+    wb.save(excel_path)
+    print("Text written to Excel file:", excel_path)
+
+# Extract text from the .doc file
+extracted_text = extract_text_from_doc(doc_file_path, table_index, row_index, col_index)
+
+# Clean the text for Excel compatibility
+if extracted_text:
+    cleaned_text = clean_text_for_excel(extracted_text)
+    # Write the cleaned text to an Excel file
+    write_text_to_excel(cleaned_text, excel_file_path)
