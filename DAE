@@ -1,0 +1,71 @@
+import win32com.client as win32
+from openpyxl import Workbook
+
+# File paths
+doc_file_path = r'path_to_your_word_doc.doc'  # Path to the .doc file
+excel_file_path = r'output.xlsx'              # Path to the output Excel file
+
+# Table and starting row specifications
+table_index = 1  # Table index in the .doc file (1-based index)
+start_row_index = 19  # Starting row in the table (1-based index)
+col_index = 1         # Column in the table (1-based index)
+
+def extract_consecutive_text_from_doc(file_path, table_idx, start_row_idx, col_idx):
+    # Open Word application
+    word_app = win32.gencache.EnsureDispatch('Word.Application')
+    word_app.Visible = False  # Set to True if you want to see Word open the file (for debugging)
+    
+    # Open the .doc file
+    doc = word_app.Documents.Open(file_path)
+    combined_text = ""  # Variable to store combined text
+    
+    try:
+        table = doc.Tables(table_idx)
+        
+        # Start reading from the specified starting row
+        row_idx = start_row_idx
+        while True:
+            try:
+                # Attempt to read text from the specified cell
+                cell_text = table.Cell(row_idx, col_idx).Range.Text.strip()
+                
+                if cell_text:  # If the cell contains text, append it to combined_text
+                    if combined_text:
+                        combined_text += " "  # Add a space between entries
+                    combined_text += cell_text
+                    row_idx += 1  # Move to the next row
+                else:
+                    break  # Stop if the cell is empty
+            except Exception:
+                # If an error occurs (e.g., row doesn't exist), treat it as an empty row
+                break
+        
+    except Exception as e:
+        print("Error during extraction:", e)
+    
+    finally:
+        # Close the document and Word application
+        doc.Close(False)
+        word_app.Quit()
+    
+    print("Extracted Combined Text:", combined_text)
+    return combined_text
+
+def write_text_to_excel(text, excel_path):
+    # Create a new Excel workbook and select the active sheet
+    wb = Workbook()
+    ws = wb.active
+    
+    # Write the text into a specific cell in Excel
+    ws['A1'] = text  # Adjust 'A1' if you want the text in a different cell
+    
+    # Save the Excel file
+    wb.save(excel_path)
+    print("Text written to Excel file:", excel_path)
+
+# Extract combined text starting from row 19 in the .doc file
+extracted_text = extract_consecutive_text_from_doc(doc_file_path, table_index, start_row_index, col_index)
+
+# Write the extracted text to an Excel file if extraction was successful
+if extracted_text:
+    write_text_to_excel(extracted_text, excel_file_path)
