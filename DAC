@@ -1,0 +1,63 @@
+import win32com.client as win32
+from openpyxl import Workbook
+
+# File paths
+doc_file_path = r'path_to_your_word_doc.doc'  # Path to the .doc file
+excel_file_path = r'output.xlsx'              # Path to the output Excel file
+
+# Table and row specifications
+table_index = 1  # Table index in the .doc file (1-based index)
+start_row_index = 19  # Starting row in the table (1-based index)
+
+def extract_text_from_rows_in_doc(file_path, table_idx, start_row_idx):
+    # Open Word application
+    word_app = win32.gencache.EnsureDispatch('Word.Application')
+    word_app.Visible = False  # Set to True if you want to see Word open the file (for debugging)
+    
+    # Open the .doc file
+    doc = word_app.Documents.Open(file_path)
+    
+    # Extract text from each cell in rows starting from the specified row until the end
+    extracted_text = []
+    try:
+        table = doc.Tables(table_idx)
+        total_rows = table.Rows.Count
+        
+        # Loop through rows starting from start_row_idx to the last row
+        for row_idx in range(start_row_idx, total_rows + 1):
+            row_text = []
+            for col_idx in range(1, table.Columns.Count + 1):  # Loop through each column
+                cell_text = table.Cell(row_idx, col_idx).Range.Text.strip()
+                row_text.append(cell_text)
+            
+            # Join row text and add it to the extracted text list
+            extracted_text.append(" | ".join(row_text))  # '|' used as separator for clarity
+            print("Row {}: {}".format(row_idx, " | ".join(row_text)))
+    
+    except Exception as e:
+        print("Error extracting text:", e)
+    finally:
+        # Close the document and Word application
+        doc.Close(False)
+        word_app.Quit()
+    
+    return "\n".join(extracted_text)  # Join all rows with a newline for final output
+
+def write_text_to_excel(text, excel_path):
+    # Create a new Excel workbook and select the active sheet
+    wb = Workbook()
+    ws = wb.active
+    
+    # Write the text into a specific cell in Excel
+    ws['A1'] = text  # Change 'A1' to any cell if needed for starting point
+    
+    # Save the Excel file
+    wb.save(excel_path)
+    print("Text written to Excel file:", excel_path)
+
+# Extract text from rows 19 onward in the .doc file
+extracted_text = extract_text_from_rows_in_doc(doc_file_path, table_index, start_row_index)
+
+# Write the extracted text to an Excel file if extraction was successful
+if extracted_text:
+    write_text_to_excel(extracted_text, excel_file_path)
