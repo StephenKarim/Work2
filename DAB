@@ -1,0 +1,35 @@
+import win32com.client as win32
+
+# File path for the .doc file
+doc_file_path = r'path_to_your_word_doc.doc'
+
+# Specify table index, row, and column for the cell you want to extract
+table_index = 1  # Table indices in Word COM start from 1 (1 is the first table)
+row_index = 1    # Row index in the table (1 is the first row)
+col_index = 1    # Column index in the table (1 is the first column)
+
+def extract_text_from_doc(file_path, table_idx, row_idx, col_idx):
+    # Open Word application
+    word_app = win32.gencache.EnsureDispatch('Word.Application')
+    word_app.Visible = False  # Set to True if you want to see Word open the file (debugging purposes)
+    
+    # Open the .doc file
+    doc = word_app.Documents.Open(file_path)
+    
+    # Extract the text from the specified cell
+    try:
+        table = doc.Tables(table_idx)
+        cell_text = table.Cell(row_idx, col_idx).Range.Text.strip()
+        print("Extracted Text:", cell_text)
+    except Exception as e:
+        print("Error extracting text:", e)
+        cell_text = None
+    finally:
+        # Close the document and Word application
+        doc.Close(False)
+        word_app.Quit()
+    
+    return cell_text
+
+# Run the extraction function
+extracted_text = extract_text_from_doc(doc_file_path, table_index, row_index, col_index)
