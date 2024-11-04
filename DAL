@@ -1,0 +1,5 @@
+def clean_text_for_excel(text):
+    # Remove any characters not allowed in Excel and replace actual line breaks with "\n"
+    cleaned_text = re.sub(r'[^\x20-\x7E\n]+', '', text)  # Keep ASCII printable characters and line breaks
+    cleaned_text = cleaned_text.replace('\n', '\\n')  # Replace line breaks with visible "\n"
+    return cleaned_text
