@@ -1,0 +1,42 @@
+from docx import Document
+from openpyxl import Workbook
+
+# Specify the Word document path and the target Excel file path
+word_file_path = 'path_to_your_word_doc.docx'
+excel_file_path = 'output.xlsx'
+
+# Specify table index, row, and column you want to extract text from
+table_index = 0  # Index of the table in the Word document (0 is the first table)
+row_index = 0    # Row in the table (0 is the first row)
+col_index = 0    # Column in the table (0 is the first column)
+
+def extract_text_from_word(word_path, table_idx, row_idx, col_idx):
+    # Open the Word document
+    doc = Document(word_path)
+    
+    # Access the specified table
+    table = doc.tables[table_idx]
+    
+    # Extract the text from the specified cell
+    cell_text = table.cell(row_idx, col_idx).text
+    
+    # Print the extracted text for verification
+    print("Extracted Text:", cell_text)
+    
+    return cell_text
+
+def write_text_to_excel(text, excel_path):
+    # Create a new Excel workbook and select the active sheet
+    wb = Workbook()
+    ws = wb.active
+    
+    # Write the text into a specific cell in Excel
+    ws['A1'] = text
+    
+    # Save the Excel file
+    wb.save(excel_path)
+    print("Text written to Excel file:", excel_path)
+
+# Run the functions to extract text from the Word doc and write to Excel
+extracted_text = extract_text_from_word(word_file_path, table_index, row_index, col_index)
+write_text_to_excel(extracted_text, excel_file_path)
